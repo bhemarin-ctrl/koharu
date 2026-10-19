@@ -32,6 +32,7 @@ pub use openrouter::OpenRouterConfig;
 use crate::{
     Error, GenerationConfig, Model, ModelSelection, Provider, ProvidersConfig, Result,
     TranslationRequest,
+    prompt::{self, Completion},
 };
 
 pub(crate) async fn translate(
@@ -41,6 +42,33 @@ pub(crate) async fn translate(
     generation: &GenerationConfig,
     request: &TranslationRequest,
 ) -> Result<Vec<String>> {
+    match selection.provider {
+        Provider::DeepL => deepl::translate(client, &providers.deepl, request).await,
+        Provider::GoogleCloudTranslation => {
+            google_cloud::translate(client, &providers.google_cloud_translation, request).await
+        }
+        Provider::Caiyun => caiyun::translate(client, &providers.caiyun, request).await,
+        provider => {
+            let completion = prompt::translation(request)?;
+            let text = complete(client, providers, selection, generation, &completion).await?;
+            Ok(prompt::translations(
+                provider.into(),
+                &text,
+                &request.segments,
+            )?)
+        }
+    }
+}
+
+/// Sends one structured-output request to a hosted language model and
+/// returns the raw JSON text. Machine-translation services cannot answer one.
+pub(crate) async fn complete(
+    client: &Client,
+    providers: &ProvidersConfig,
+    selection: &ModelSelection,
+    generation: &GenerationConfig,
+    completion: &Completion,
+) -> Result<String> {
     let model = || {
         selection
             .model
@@ -49,46 +77,47 @@ pub(crate) async fn translate(
     };
     match selection.provider {
         Provider::OpenAi => {
-            openai::translate(client, &providers.openai, model()?, generation, request).await
+            openai::complete(client, &providers.openai, model()?, generation, completion).await
         }
         Provider::Gemini => {
-            gemini::translate(client, &providers.gemini, model()?, generation, request).await
+            gemini::complete(client, &providers.gemini, model()?, generation, completion).await
         }
         Provider::Claude => {
-            claude::translate(client, &providers.claude, model()?, generation, request).await
+            claude::complete(client, &providers.claude, model()?, generation, completion).await
         }
         Provider::Grok => {
-            grok::translate(client, &providers.grok, model()?, generation, request).await
+            grok::complete(client, &providers.grok, model()?, generation, completion).await
         }
         Provider::MiniMax => {
-            minimax::translate(client, &providers.minimax, model()?, generation, request).await
+            minimax::complete(client, &providers.minimax, model()?, generation, completion).await
         }
         Provider::DeepSeek => {
-            deepseek::translate(client, &providers.deepseek, model()?, generation, request).await
+            deepseek::complete(client, &providers.deepseek, model()?, generation, completion).await
         }
         Provider::OpenAiCompatible => {
-            openai_compatible::translate(
+            openai_compatible::complete(
                 client,
                 &providers.openai_compatible,
                 model()?,
                 generation,
-                request,
+                completion,
             )
             .await
         }
         Provider::OpenRouter => {
-            openrouter::translate(client, &providers.openrouter, model()?, generation, request)
+            openrouter::complete(client, &providers.openrouter, model()?, generation, completion)
                 .await
         }
         Provider::LmStudio => {
-            lm_studio::translate(client, &providers.lm_studio, model()?, generation, request).await
+            lm_studio::complete(client, &providers.lm_studio, model()?, generation, completion)
+                .await
         }
-        Provider::DeepL => deepl::translate(client, &providers.deepl, request).await,
-        Provider::GoogleCloudTranslation => {
-            google_cloud::translate(client, &providers.google_cloud_translation, request).await
+        Provider::DeepL | Provider::GoogleCloudTranslation | Provider::Caiyun => {
+            Err(Error::PromptUnsupported {
+                provider: selection.provider.into(),
+            })
         }
-        Provider::Caiyun => caiyun::translate(client, &providers.caiyun, request).await,
-        Provider::Local => unreachable!("local translation has its own backend"),
+        Provider::Local => unreachable!("local models have their own backend"),
     }
 }
 

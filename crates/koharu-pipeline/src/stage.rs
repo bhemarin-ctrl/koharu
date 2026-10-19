@@ -22,14 +22,16 @@ use specta::Type;
 pub enum Stage {
     Detection,
     Ocr,
+    Summary,
     Translation,
     Inpainting,
 }
 
 impl Stage {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Detection,
         Self::Ocr,
+        Self::Summary,
         Self::Translation,
         Self::Inpainting,
     ];

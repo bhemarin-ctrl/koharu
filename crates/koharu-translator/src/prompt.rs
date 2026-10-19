@@ -1,17 +1,31 @@
-use std::fmt::Write;
+use std::{fmt::Write, sync::Arc};
 
 use anyhow::Context;
+use image::DynamicImage;
 use indoc::indoc;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use serde_json::{Value, json};
 
-use crate::{Language, TranslationContext, TranslationRequest};
+use crate::{Language, SummaryRequest, TranslationContext, TranslationRequest};
 
-pub(crate) fn prompts(request: &TranslationRequest) -> anyhow::Result<(String, String)> {
+/// One structured-output request to a language model. Every LLM provider
+/// receives this shape, so translation and scene summaries share the same
+/// provider code path and the same native structured-output enforcement.
+pub(crate) struct Completion {
+    pub(crate) name: &'static str,
+    pub(crate) system: String,
+    pub(crate) user: String,
+    pub(crate) image: Option<Arc<DynamicImage>>,
+    pub(crate) schema: Value,
+}
+
+pub(crate) fn translation(request: &TranslationRequest) -> anyhow::Result<Completion> {
     let input = TranslationInput {
         source_language: request.source_language,
         target_language: request.target_language,
+        previous_scenes: &request.previous_scenes,
         context: &request.context,
+        scene: request.scene.as_deref(),
         segments: request
             .segments
             .iter()
@@ -20,7 +34,33 @@ pub(crate) fn prompts(request: &TranslationRequest) -> anyhow::Result<(String, S
             .collect(),
     };
     let user = serde_json::to_string(&input).context("failed to serialize translation input")?;
-    Ok((translation_system_prompt(request), user))
+    Ok(Completion {
+        name: "manga_translation",
+        system: translation_system_prompt(request),
+        user,
+        image: request.image.clone(),
+        schema: output_schema(request.segments.len()),
+    })
+}
+
+pub(crate) fn summary(request: &SummaryRequest) -> anyhow::Result<Completion> {
+    let input = SummaryInput {
+        previous_scene: request.previous_scene.as_deref(),
+        segments: request
+            .segments
+            .iter()
+            .enumerate()
+            .map(|(id, text)| TranslationInputSegment { id, text })
+            .collect(),
+    };
+    let user = serde_json::to_string(&input).context("failed to serialize summary input")?;
+    Ok(Completion {
+        name: "manga_scene_summary",
+        system: summary_system_prompt(request),
+        user,
+        image: Some(Arc::clone(&request.image)),
+        schema: summary_schema(),
+    })
 }
 
 pub(crate) fn translations(
@@ -46,6 +86,18 @@ pub(crate) fn translations(
     }
 
     Ok(translations)
+}
+
+pub(crate) fn summary_text(provider: &str, text: &str) -> anyhow::Result<String> {
+    let output = serde_json::from_str::<SummaryOutput>(text).with_context(|| {
+        format!(
+            "{provider} returned invalid scene summary JSON; response was: {}",
+            snippet(text),
+        )
+    })?;
+    let summary = output.summary.trim();
+    anyhow::ensure!(!summary.is_empty(), "{provider} returned an empty scene summary");
+    Ok(summary.to_owned())
 }
 
 /// Keeps a model response readable in a log line without truncating so hard
@@ -112,6 +164,20 @@ pub(crate) fn output_schema(expected: usize) -> Value {
     })
 }
 
+fn summary_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "summary": {
+                "type": "string",
+                "description": "What happens on the page, in prose."
+            }
+        },
+        "required": ["summary"],
+        "additionalProperties": false
+    })
+}
+
 fn translation_system_prompt(request: &TranslationRequest) -> String {
     let source = request
         .source_language
@@ -126,6 +192,7 @@ fn translation_system_prompt(request: &TranslationRequest) -> String {
             - Preserve meaning, character voice, emotional tone, relationship nuance, emphasis, and sound effects.
             - Localize idioms and sound effects naturally while keeping wording concise enough for speech bubbles.
             - Use surrounding segments only for disambiguation and continuity; never merge or split segments.
+            - Segments are listed in reading order, one per speech bubble or caption. A sentence may run across consecutive segments; translate each part so the split reads naturally in {target}.
             - Write every translated `text` value only in {target}; do not include source text, notes, explanations, or alternatives.
             - Never preserve or repeat original-language text; translate names, terms, and sound effects using natural {target} conventions.
 
@@ -145,8 +212,19 @@ fn translation_system_prompt(request: &TranslationRequest) -> String {
         prompt.push_str("\n\n");
         prompt.push_str(indoc! {"
             Context requirements:
-            Use the supplied context only to preserve terminology, character voice, and dialogue continuity.
+            The `context` entries are dialogue already translated on the previous pages, oldest first.
+            Use them only to keep names, terms, forms of address, character voice, and dialogue continuity consistent.
             Do not translate or return the context entries.
+        "}.trim_end());
+    }
+
+    if request.scene.is_some() || !request.previous_scenes.is_empty() {
+        prompt.push_str("\n\n");
+        prompt.push_str(indoc! {"
+            Scene requirements:
+            `scene` describes what happens on this page and may refer to segments by their `id`; `previous_scenes` describe the previous pages, oldest first.
+            Use them to identify who is speaking or thinking, their tone, and how the story continues.
+            Do not translate or return the scene descriptions.
         "}.trim_end());
     }
 
@@ -171,12 +249,61 @@ fn translation_system_prompt(request: &TranslationRequest) -> String {
     prompt
 }
 
+fn summary_system_prompt(request: &SummaryRequest) -> String {
+    let mut prompt = format!(
+        indoc! {"
+            You describe manga pages for a translator who will translate the page's text segments.
+
+            Summary requirements:
+            - Write in {language}, in two to five sentences of plain prose.
+            - Describe the setting, who appears, what happens in reading order, and the mood.
+            - When `segments` are supplied, say who most likely says or thinks each one, referring to segments by their `id`, and whether a segment is speech, thought, narration, or a sound effect.
+            - `previous_scene` describes the previous page; keep names and roles consistent with it.
+            - Name a character only when the name appears in the segments, the previous scene, or the additional instructions; otherwise describe them, for example \"the blond boy\".
+            - Do not translate the segments line by line and do not add notes, lists, headings, or alternatives.
+
+            Output requirements:
+            - Return only a JSON object with a `summary` string.
+        "},
+        language = request.language,
+    )
+    .trim_end()
+    .to_owned();
+
+    if let Some(instructions) = request
+        .instructions
+        .as_deref()
+        .map(str::trim)
+        .filter(|instructions| !instructions.is_empty())
+    {
+        prompt.push_str("\n\nAdditional instructions for this work:\n");
+        prompt.push_str(instructions);
+    }
+    prompt
+}
+
 #[derive(Serialize)]
 struct TranslationInput<'a> {
     source_language: Option<Language>,
     target_language: Language,
+    #[serde(skip_serializing_if = "<[String]>::is_empty")]
+    previous_scenes: &'a [String],
     context: &'a [TranslationContext],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scene: Option<&'a str>,
     segments: Vec<TranslationInputSegment<'a>>,
+}
+
+#[derive(Serialize)]
+struct SummaryInput<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    previous_scene: Option<&'a str>,
+    segments: Vec<TranslationInputSegment<'a>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SummaryOutput {
+    summary: String,
 }
 
 #[derive(Serialize)]
@@ -322,8 +449,8 @@ mod tests {
     fn prompt_payload_contains_ordered_context() {
         let request = TranslationRequest::new(["new"], Language::English)
             .with_context([TranslationContext::new("old", "previous")]);
-        let (_, user) = prompts(&request).unwrap();
-        let input: serde_json::Value = serde_json::from_str(&user).unwrap();
+        let completion = translation(&request).unwrap();
+        let input: serde_json::Value = serde_json::from_str(&completion.user).unwrap();
         assert_eq!(input["context"][0]["source"], "old");
         assert_eq!(input["context"][0]["translation"], "previous");
         assert_eq!(input["segments"][0]["id"], 0);
@@ -366,6 +493,59 @@ mod tests {
         let prompt = translation_system_prompt(&request);
         assert!(prompt.contains("dialogue continuity"));
         assert!(prompt.contains("Do not translate or return the context"));
+    }
+
+    #[test]
+    fn page_memory_reaches_the_payload_and_the_rules() {
+        let request = TranslationRequest::new(["この世界に"], Language::English)
+            .with_context([TranslationContext::new("前の台詞", "earlier line")])
+            .with_scene("Segment 0 is the boy's inner thought.")
+            .with_previous_scenes(["The boy enters a forest.".to_owned()]);
+        let completion = translation(&request).unwrap();
+        let input: serde_json::Value = serde_json::from_str(&completion.user).unwrap();
+        assert_eq!(input["scene"], "Segment 0 is the boy's inner thought.");
+        assert_eq!(input["previous_scenes"][0], "The boy enters a forest.");
+        assert_eq!(input["context"][0]["translation"], "earlier line");
+        assert!(completion.system.contains("Scene requirements"));
+        assert!(completion.system.contains("Do not translate or return the scene"));
+    }
+
+    #[test]
+    fn a_page_without_memory_sends_no_scene_fields() {
+        let completion = translation(&TranslationRequest::new(["text"], Language::English)).unwrap();
+        let input: serde_json::Value = serde_json::from_str(&completion.user).unwrap();
+        assert!(input.get("scene").is_none());
+        assert!(input.get("previous_scenes").is_none());
+        assert!(!completion.system.contains("Scene requirements"));
+    }
+
+    #[test]
+    fn summary_requests_the_image_and_a_single_summary_field() {
+        let request = SummaryRequest::new(
+            std::sync::Arc::new(image::DynamicImage::new_rgb8(1, 1)),
+            Language::English,
+        )
+        .with_segments(["自分の生きた証を"])
+        .with_previous_scene("The boy faces wolves.")
+        .with_instructions("Never keep honorifics.");
+        let completion = summary(&request).unwrap();
+        assert!(completion.image.is_some());
+        assert_eq!(completion.schema["required"][0], "summary");
+        assert_eq!(completion.schema["additionalProperties"], false);
+        let input: serde_json::Value = serde_json::from_str(&completion.user).unwrap();
+        assert_eq!(input["segments"][0]["id"], 0);
+        assert_eq!(input["previous_scene"], "The boy faces wolves.");
+        assert!(completion.system.contains("Never keep honorifics."));
+    }
+
+    #[test]
+    fn summary_output_fails_closed() {
+        assert_eq!(
+            summary_text("test", r#"{"summary":"  A forest.  "}"#).unwrap(),
+            "A forest."
+        );
+        assert!(summary_text("test", r#"{"summary":"   "}"#).is_err());
+        assert!(summary_text("test", "A forest.").is_err());
     }
 
     #[test]

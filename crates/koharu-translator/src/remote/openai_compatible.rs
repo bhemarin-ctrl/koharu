@@ -8,8 +8,8 @@ use url::Url;
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image,
-    display_name, prompt,
+    GenerationConfig, Model, Provider, Result, backend::encode_image,
+    display_name, prompt::Completion,
 };
 
 const DEFAULT_BASE_URL: &str = "http://localhost:11434/v1";
@@ -30,16 +30,16 @@ impl Default for OpenAiCompatibleConfig {
     }
 }
 
-pub(super) async fn translate(
+pub(super) async fn complete(
     client: &Client,
     config: &OpenAiCompatibleConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    completion: &Completion,
+) -> Result<String> {
     let api_key = koharu_secrets::get("openai-compatible")?;
-    let (system, user) = prompt::prompts(request)?;
-    let user_content = match request.image.as_deref() {
+    let (system, user) = (completion.system.clone(), completion.user.clone());
+    let user_content = match completion.image.as_deref() {
         Some(image) => MessageContent::Parts(vec![
             ContentPart::Text { text: user },
             ContentPart::ImageUrl {
@@ -73,9 +73,9 @@ pub(super) async fn translate(
         response_format: ResponseFormat {
             kind: "json_schema",
             json_schema: JsonSchema {
-                name: "manga_translation",
+                name: completion.name,
                 strict: true,
-                schema: prompt::output_schema(request.segments.len()),
+                schema: completion.schema.clone(),
             },
         },
     };
@@ -95,11 +95,7 @@ pub(super) async fn translate(
         .message
         .content
         .context("OpenAI-compatible backend returned no message content")?;
-    Ok(prompt::translations(
-        "openai-compatible",
-        &text,
-        &request.segments,
-    )?)
+    Ok(text)
 }
 
 pub(super) async fn models(client: &Client, config: &OpenAiCompatibleConfig) -> Result<Vec<Model>> {
@@ -254,7 +250,7 @@ mod tests {
                 json_schema: JsonSchema {
                     name: "manga_translation",
                     strict: true,
-                    schema: prompt::output_schema(2),
+                    schema: crate::prompt::output_schema(2),
                 },
             },
         };

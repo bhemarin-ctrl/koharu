@@ -1,6 +1,9 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
 };
 
 use anyhow::{Result, bail};
@@ -41,9 +44,17 @@ impl Operation {
             } => vec![Stage::Detection],
             Self::Through { stage: Stage::Ocr } => vec![Stage::Detection, Stage::Ocr],
             Self::Through {
+                stage: Stage::Summary,
+            } => vec![Stage::Detection, Stage::Ocr, Stage::Summary],
+            Self::Through {
                 stage: Stage::Translation,
             } => {
-                vec![Stage::Detection, Stage::Ocr, Stage::Translation]
+                vec![
+                    Stage::Detection,
+                    Stage::Ocr,
+                    Stage::Summary,
+                    Stage::Translation,
+                ]
             }
             Self::Through {
                 stage: Stage::Inpainting,
@@ -68,6 +79,10 @@ pub struct Request {
     pub stop: StopToken,
     pub progress: Option<ProgressSink>,
     pub inpainting_mask: Option<InpaintingMask>,
+    /// When set, pages run one at a time and the next page waits this long
+    /// after the previous page finishes, which keeps hosted models under
+    /// their rate limits during long batches.
+    pub page_interval: Option<Duration>,
 }
 
 impl Default for Request {
@@ -78,6 +93,7 @@ impl Default for Request {
             stop: StopToken::default(),
             progress: None,
             inpainting_mask: None,
+            page_interval: None,
         }
     }
 }

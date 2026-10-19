@@ -18,7 +18,8 @@ mod stage_runner;
 mod stages;
 
 pub use config::{
-    DetectionModel, InpaintingModel, OcrModel, PipelineConfig, ProcessorConfig, TranslationConfig,
+    DetectionModel, InpaintingModel, OcrModel, PipelineConfig, ProcessorConfig, SummaryConfig,
+    TranslationConfig,
 };
 pub use error::{ErrorKind, PipelineError};
 pub use pipeline::Pipeline;

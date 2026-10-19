@@ -46,6 +46,7 @@ export const commands = {
 	movePage: (page: EntityId, index: number) => __TAURI_INVOKE<null>("move_page", { page, index }),
 	setSourceText: (layer: EntityId, text: string) => __TAURI_INVOKE<null>("set_source_text", { layer, text }),
 	setTranslation: (layer: EntityId, text: string | null) => __TAURI_INVOKE<null>("set_translation", { layer, text }),
+	setSceneSummary: (page: EntityId, text: string | null) => __TAURI_INVOKE<null>("set_scene_summary", { page, text }),
 	setTypography: (updates: TypographyUpdate[]) => __TAURI_INVOKE<null>("set_typography", { updates: updates.map(i=>({...i,typography:({...i.typography,size:i.typography.size==null?i.typography.size:i.typography.size,stroke_width:i.typography.stroke_width==null?i.typography.stroke_width:i.typography.stroke_width})})) }),
 	setGeometry: (updates: GeometryUpdate[]) => __TAURI_INVOKE<null>("set_geometry", { updates: updates.map(i=>({...i,points:i.points==null?i.points:i.points.map(i=>i)})) }),
 	setVisibility: (layers: EntityId[], visible: boolean | null, opacity: number | null) => __TAURI_INVOKE<null>("set_visibility", { layers, visible, opacity: opacity==null?opacity:opacity }),
@@ -53,7 +54,7 @@ export const commands = {
 	moveLayer: (layer: EntityId, parent: EntityId, index: number) => __TAURI_INVOKE<Page>("move_layer", { layer, parent, index }).then((v) => (({...v,layers:v.layers.map(i=>i),regions:v.regions.map(i=>({...i,geometry:({...i.geometry,points:i.geometry.points.map(i=>i)})}))}) as typeof v)),
 	undo: () => __TAURI_INVOKE<null>("undo"),
 	redo: () => __TAURI_INVOKE<null>("redo"),
-	process: (scope: Scope, operation: Operation) => __TAURI_INVOKE<JobId>("process", { scope, operation }),
+	process: (scope: Scope, operation: Operation, pageIntervalSeconds: number | null) => __TAURI_INVOKE<JobId>("process", { scope, operation, pageIntervalSeconds }),
 	stopJob: (job: JobId) => __TAURI_INVOKE<null>("stop_job", { job }),
 	export: (format: ExportFormat) => __TAURI_INVOKE<null>("export", { format }),
 	getThumbnail: (page: EntityId) => __TAURI_INVOKE<ThumbnailBytes>("get_thumbnail", { page }),
@@ -272,6 +273,11 @@ export type Job = {
 	page: EntityId | null,
 	stage: Stage | null,
 	model: string | null,
+	/**
+	 *  While a paced batch pauses between pages, when the next page starts,
+	 *  in milliseconds since the Unix epoch.
+	 */
+	resumes_at: number | null,
 	error: string | null,
 };
 
@@ -354,6 +360,7 @@ export type Page = {
 	size: PageSize,
 	layers: Layer[],
 	regions: AnalysisRegion[],
+	scene_summary: SceneSummary | null,
 };
 
 export type PageImportSource = "files" | "folder";
@@ -384,6 +391,7 @@ export type PaintBrush = {
 export type PipelineConfig = {
 	detection: DetectionModel,
 	ocr: OcrModel,
+	summary: SummaryConfig,
 	translation: TranslationConfig,
 	inpainting: InpaintingModel,
 	/**
@@ -456,7 +464,18 @@ export type RoremMixedConfig = {
 
 export type RunId = string;
 
-export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] } | { scope: "region"; value: {
+/**
+ *  What happens on the page, used as context when the page is translated.
+ */
+export type SceneSummary = {
+	text: string,
+	/**
+	 *  Written by the scene-summary step rather than by the user.
+	 */
+	generated: boolean,
+};
+
+export type Scope ={ scope: "project" } | { scope: "pages"; value: EntityId[] } | { scope: "region"; value: {
 	page: EntityId,
 	bounds: Bounds,
 } } | { scope: "entities"; value: EntityId[] };
@@ -466,12 +485,24 @@ export type SourceText = {
 	language: string | null,
 };
 
-export type Stage = "detection" | "ocr" | "translation" | "inpainting";
+export type Stage = "detection" | "ocr" | "summary" | "translation" | "inpainting";
 
 export type StartupState = {
 	preferences: Preferences,
 	jobs: Job[],
 	canvas: CanvasState,
+};
+
+/**
+ *  The scene summary describes each page with a vision model before it is
+ *  translated. It writes in the translation's target language and follows the
+ *  translation instructions.
+ */
+export type SummaryConfig = {
+	/**
+	 *  `None` describes pages with the translation model.
+	 */
+	model?: ModelSelection | null,
 };
 
 export type TextAlignment = "Start" | "Center" | "End" | "Justify";

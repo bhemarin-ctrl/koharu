@@ -16,7 +16,7 @@ use koharu_ml::Device;
 use error::{Error, Result};
 use local::LocalTranslator;
 
-pub use backend::{TranslationContext, TranslationRequest};
+pub use backend::{SummaryRequest, TranslationContext, TranslationRequest};
 pub use language::Language;
 pub use model::{GenerationConfig, Model, ModelSelection, Quantization};
 pub(crate) use model::{ModelGeneration, QuantizationDefinition, display_name};
@@ -135,6 +135,35 @@ impl Translator {
             .into());
         }
         Ok((provider_id, translated))
+    }
+
+    /// Describes one page with a vision-capable model. The caller decides
+    /// whether a model without image input should skip this step.
+    pub async fn summarize(
+        &self,
+        selection: &ModelSelection,
+        generation: GenerationConfig,
+        mut request: SummaryRequest,
+    ) -> anyhow::Result<(&'static str, String)> {
+        let provider = selection.provider;
+        let provider_id: &'static str = provider.into();
+        let generation = generation.for_model(selection);
+        anyhow::ensure!(
+            Self::supports_vision(selection, &generation),
+            "{provider_id} cannot describe pages without image input; enable vision or choose a vision model"
+        );
+        request.prepare_image()?;
+        let completion = prompt::summary(&request)?;
+        let text = if provider == Provider::Local {
+            self.local(selection)
+                .await?
+                .complete(completion, generation)
+                .await?
+        } else {
+            let providers = self.providers.read()?.clone();
+            remote::complete(&self.client, &providers, selection, &generation, &completion).await?
+        };
+        Ok((provider_id, prompt::summary_text(provider_id, &text)?))
     }
 
     #[tracing::instrument(skip_all)]

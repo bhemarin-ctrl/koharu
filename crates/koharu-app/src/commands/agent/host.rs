@@ -154,6 +154,7 @@ impl KoharuHost {
             stop,
             progress: None,
             inpainting_mask: None,
+            page_interval: None,
         };
         let result = self
             .handle

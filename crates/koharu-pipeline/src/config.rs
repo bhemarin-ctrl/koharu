@@ -9,6 +9,7 @@ use crate::stages::{Flux2KleinConfig, KoharuLayoutRFDetrSeg2XLConfig, RoremMixed
 pub struct PipelineConfig {
     pub detection: DetectionModel,
     pub ocr: OcrModel,
+    pub summary: SummaryConfig,
     pub translation: TranslationConfig,
     pub inpainting: InpaintingModel,
     /// Settings for every model are kept independently of the active model.
@@ -21,6 +22,7 @@ pub struct PipelineConfig {
 struct PipelineFile {
     detection: ModelSelection,
     ocr: ModelSelection,
+    summary: SummaryConfig,
     translation: TranslationConfig,
     inpainting: ModelSelection,
     #[serde(default)]
@@ -36,6 +38,7 @@ impl Default for PipelineFile {
             ocr: ModelSelection {
                 model: "paddleocr-vl-1.6".to_owned(),
             },
+            summary: SummaryConfig::default(),
             translation: TranslationConfig::default(),
             inpainting: ModelSelection {
                 model: "lama".to_owned(),
@@ -92,6 +95,7 @@ impl Serialize for PipelineConfig {
             ocr: ModelSelection {
                 model: ocr.to_owned(),
             },
+            summary: self.summary.clone(),
             translation: self.translation.clone(),
             inpainting: ModelSelection {
                 model: inpainting.to_owned(),
@@ -150,6 +154,7 @@ impl<'de> Deserialize<'de> for PipelineConfig {
         Ok(Self {
             detection,
             ocr,
+            summary: file.summary,
             translation: file.translation,
             inpainting,
             processor: file.processor,
@@ -164,10 +169,31 @@ impl Default for PipelineConfig {
                 KoharuLayoutRFDetrSeg2XLConfig::default(),
             ),
             ocr: OcrModel::PaddleOcrVl1_6,
+            summary: SummaryConfig::default(),
             translation: TranslationConfig::default(),
             inpainting: InpaintingModel::LaMa {},
             processor: ProcessorConfig::default(),
         }
+    }
+}
+
+/// The scene summary describes each page with a vision model before it is
+/// translated. It writes in the translation's target language and follows the
+/// translation instructions.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
+#[serde(default)]
+pub struct SummaryConfig {
+    /// `None` describes pages with the translation model.
+    pub model: Option<koharu_translator::ModelSelection>,
+}
+
+impl SummaryConfig {
+    #[must_use]
+    pub fn model<'a>(
+        &'a self,
+        translation: &'a TranslationConfig,
+    ) -> &'a koharu_translator::ModelSelection {
+        self.model.as_ref().unwrap_or(&translation.model)
     }
 }
 
@@ -436,6 +462,7 @@ mod tests {
                 ..Default::default()
             }),
             ocr: OcrModel::PaddleOcrVl1_6,
+            summary: SummaryConfig::default(),
             translation: TranslationConfig::default(),
             inpainting: InpaintingModel::Flux2Klein(Flux2KleinConfig {
                 prompt: "Keep the line art.".to_owned(),

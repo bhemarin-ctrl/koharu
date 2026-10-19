@@ -1,6 +1,7 @@
 mod detection;
 mod inpainting;
 mod ocr;
+mod summary;
 mod translation;
 
 use std::{collections::BTreeSet, sync::Arc};
@@ -72,6 +73,7 @@ trait StageProcessor: Send + Sync {
 pub(crate) struct Stages {
     detection: detection::Processor,
     ocr: ocr::Processor,
+    summary: summary::Processor,
     translation: translation::Processor,
     inpainting: inpainting::Processor,
 }
@@ -85,6 +87,11 @@ impl Stages {
         Ok(Self {
             detection: detection::Processor::new(config.detection()?, device.clone()),
             ocr: ocr::Processor::new(config.ocr.clone(), device.clone()),
+            summary: summary::Processor::new(
+                config.summary.clone(),
+                config.translation.clone(),
+                translator.clone(),
+            ),
             translation: translation::Processor::new(config.translation.clone(), translator),
             inpainting: inpainting::Processor::new(config.inpainting()?, device.clone())?,
         })
@@ -94,6 +101,7 @@ impl Stages {
         match stage {
             Stage::Detection => &self.detection,
             Stage::Ocr => &self.ocr,
+            Stage::Summary => &self.summary,
             Stage::Translation => &self.translation,
             Stage::Inpainting => &self.inpainting,
         }
@@ -128,6 +136,30 @@ fn generation(producer: &str, model: &str) -> Result<Generation> {
 
 fn finish(edit: Edit) -> Result<Patch> {
     edit.finish().map_err(Into::into)
+}
+
+/// The page's non-empty source texts in reading order, which is the order of
+/// the page text group.
+fn page_sources(scene: &Snapshot, page: EntityId) -> Result<Vec<(EntityId, String)>> {
+    let mut sources = Vec::new();
+    if let Some(group) = scene.page(page)?.text_group()? {
+        for layer in group.text_layers()? {
+            let content = layer.content()?;
+            if let Some(source) = content.source()?
+                && !source.text.value.trim().is_empty()
+            {
+                sources.push((content.id(), source.text.value));
+            }
+        }
+    }
+    Ok(sources)
+}
+
+/// The page right before `page` in project order.
+fn previous_page(scene: &Snapshot, page: EntityId) -> Option<EntityId> {
+    let pages = scene.pages().map(|page| page.id()).collect::<Vec<_>>();
+    let position = pages.iter().position(|candidate| *candidate == page)?;
+    position.checked_sub(1).map(|previous| pages[previous])
 }
 
 #[cfg(test)]
@@ -165,6 +197,7 @@ mod tests {
             [
                 "koharu-layout-rfdetr-seg-2xl",
                 "paddleocr-vl-1.6",
+                "local",
                 "local",
                 "lama",
             ]

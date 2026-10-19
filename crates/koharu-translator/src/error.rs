@@ -22,6 +22,8 @@ pub enum Error {
         expected: usize,
         actual: usize,
     },
+    #[error("{provider} only translates text and cannot run model prompts such as scene summaries")]
+    PromptUnsupported { provider: &'static str },
     #[error("{provider} quota or rate limit was exceeded")]
     QuotaExceeded { provider: &'static str },
     #[error("{provider} API request failed with HTTP {status}: {message}")]

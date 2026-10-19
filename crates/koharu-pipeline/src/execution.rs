@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use anyhow::{Context as _, Result, ensure};
@@ -19,6 +19,8 @@ use crate::{
     stage_runner::{StageCompletion, StageJob, StageOutcome, StageRunner},
     stages::StageInput,
 };
+
+const STOP_POLL: Duration = Duration::from_millis(250);
 
 pub(crate) struct Execution<'a> {
     runner: Arc<StageRunner>,
@@ -79,7 +81,7 @@ impl<'a> Execution<'a> {
             stop: request.stop,
             progress: request.progress,
             scope,
-            scheduler: Scheduler::new(&pages, &stages),
+            scheduler: Scheduler::new(&pages, &stages, request.page_interval),
             scene: snapshot,
             images: BTreeMap::new(),
             busy_stages: BTreeSet::new(),
@@ -106,6 +108,15 @@ impl<'a> Execution<'a> {
                 running.push(runner.run(job));
             }
 
+            if running.is_empty()
+                && !self.stopped()
+                && self.failure.is_none()
+                && let Some((next, resume_at)) = self.scheduler.waiting()
+            {
+                self.pause_until(next, resume_at).await;
+                continue;
+            }
+
             let Some(completion) = running.next().await else {
                 break;
             };
@@ -119,6 +130,24 @@ impl<'a> Execution<'a> {
         }
 
         self.finalize()
+    }
+
+    /// Sleeps between pages of a paced batch. Stopping ends the pause early.
+    async fn pause_until(&self, next: EntityId, resume_at: Instant) {
+        progress::emit(
+            self.progress.as_ref(),
+            Progress::Waiting {
+                next,
+                remaining: resume_at.saturating_duration_since(Instant::now()),
+            },
+        );
+        while !self.stopped() {
+            let remaining = resume_at.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            tokio::time::sleep(remaining.min(STOP_POLL)).await;
+        }
     }
 
     fn take_ready_job(&mut self) -> Option<StageJob> {

@@ -7,7 +7,8 @@ use koharu_scene::{
     AssetInput, AssetMetadata, AssetRole, At, Authored, Commit, EntityId, EntityOrigin,
     Geometry as SceneGeometry, Group as SceneGroup, Origin, PageDraft, Point as ScenePoint,
     Presents, RasterLayer as SceneRasterLayer, RasterLayerKind, Region as SceneRegion,
-    RemovePolicy, Revision, Session, Snapshot, SourceText as SceneSourceText,
+    RemovePolicy, Revision, SceneSummary as SceneSceneSummary, Session, Snapshot,
+    SourceText as SceneSourceText,
     TextGroup as SceneTextGroup, TextLayout as SceneTextLayout, TextLayoutKind,
     Translation as SceneTranslation, Typography as SceneTypography, Visibility as SceneVisibility,
 };
@@ -63,6 +64,15 @@ pub struct Page {
     pub size: PageSize,
     pub layers: Vec<Layer>,
     pub regions: Vec<AnalysisRegion>,
+    pub scene_summary: Option<SceneSummary>,
+}
+
+/// What happens on the page, used as context when the page is translated.
+#[derive(Clone, Debug, Serialize, Type)]
+pub struct SceneSummary {
+    pub text: String,
+    /// Written by the scene-summary step rather than by the user.
+    pub generated: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Type)]
@@ -523,6 +533,28 @@ impl Project {
         self.commit(patch).await
     }
 
+    pub(crate) async fn set_scene_summary(
+        &mut self,
+        page: EntityId,
+        text: Option<String>,
+    ) -> Result<Commit> {
+        let snapshot = self.snapshot();
+        snapshot.page(page)?;
+        let existing = snapshot.component::<SceneSceneSummary>(page)?;
+        let text = text.filter(|text| !text.trim().is_empty());
+        let patch = snapshot.patch(|edit| match text {
+            Some(text) => edit.set(
+                page,
+                &SceneSceneSummary {
+                    text: Authored::user(text),
+                },
+            ),
+            None if existing.is_some() => edit.remove::<SceneSceneSummary>(page),
+            None => Ok(()),
+        })?;
+        self.commit(patch).await
+    }
+
     pub(crate) async fn set_typography(
         &mut self,
         updates: Vec<TypographyUpdate>,
@@ -975,6 +1007,12 @@ impl Project {
             .into_iter()
             .flatten()
             .collect();
+        let scene_summary = snapshot
+            .component::<SceneSceneSummary>(page)?
+            .map(|summary| SceneSummary {
+                generated: matches!(summary.text.origin, Origin::Generated(_)),
+                text: summary.text.value,
+            });
         Ok(Page {
             id: page,
             label: value.label,
@@ -984,6 +1022,7 @@ impl Project {
             },
             layers,
             regions,
+            scene_summary,
         })
     }
 

@@ -115,7 +115,12 @@ fn operations_expand_to_the_supported_workflows() {
         }
         .stages()
         .unwrap(),
-        vec![Stage::Detection, Stage::Ocr, Stage::Translation],
+        vec![
+            Stage::Detection,
+            Stage::Ocr,
+            Stage::Summary,
+            Stage::Translation
+        ],
     );
     assert_eq!(
         Operation::Through {

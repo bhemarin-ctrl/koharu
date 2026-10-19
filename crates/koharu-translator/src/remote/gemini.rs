@@ -11,8 +11,8 @@ use url::Url;
 
 use super::send_json;
 use crate::{
-    GenerationConfig as TranslationGeneration, Model, Provider, Result, TranslationRequest,
-    backend::encode_image, prompt,
+    GenerationConfig as TranslationGeneration, Model, Provider, Result,
+    backend::encode_image, prompt::Completion,
 };
 
 const ROOT: &str = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -73,23 +73,23 @@ fn supports_translation(id: &str) -> bool {
     .any(|marker| id.contains(marker))
 }
 
-pub(super) async fn translate(
+pub(super) async fn complete(
     client: &Client,
     _config: &GeminiConfig,
     model: &str,
     generation: &TranslationGeneration,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    completion: &Completion,
+) -> Result<String> {
     let api_key = koharu_secrets::get("gemini")?.context("gemini API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
-    let schema = prompt::output_schema(request.segments.len());
+    let (system, user) = (completion.system.clone(), completion.user.clone());
+    let schema = completion.schema.clone();
     let mut url =
         Url::parse(&format!("{ROOT}/{model}:generateContent")).expect("Gemini API root is valid");
     url.query_pairs_mut()
         .append_pair("key", api_key.expose_secret());
     let body = Request {
         system_instruction: Content::text(&system),
-        contents: [Content::user(&user, request.image.as_deref())?],
+        contents: [Content::user(&user, completion.image.as_deref())?],
         generation_config: GenerationConfig {
             temperature: generation.temperature,
             max_output_tokens: generation.max_tokens,
@@ -124,7 +124,7 @@ pub(super) async fn translate(
         .and_then(|candidate| candidate.content.parts.into_iter().next())
         .context("Gemini returned no candidate content")?
         .text;
-    Ok(prompt::translations("gemini", &text, &request.segments)?)
+    Ok(text)
 }
 
 #[derive(Serialize)]
@@ -247,7 +247,7 @@ mod tests {
             max_output_tokens: None,
             thinking_config: None,
             response_mime_type: "application/json",
-            response_json_schema: prompt::output_schema(2),
+            response_json_schema: crate::prompt::output_schema(2),
         };
         let value = serde_json::to_value(config).unwrap();
         assert_eq!(value["responseMimeType"], "application/json");

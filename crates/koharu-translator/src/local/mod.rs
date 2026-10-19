@@ -13,7 +13,8 @@ pub(crate) use catalog::{DEFAULT_MODEL, DEFAULT_QUANTIZATION};
 
 use crate::{
     Device, Error, GenerationConfig, Model, ModelSelection, Provider, Quantization, Result,
-    TranslationRequest, prompt,
+    TranslationRequest,
+    prompt::{self, Completion},
 };
 
 #[derive(Debug)]
@@ -72,15 +73,24 @@ impl LocalTranslator {
                 language: request.target_language,
             });
         }
+        let completion = prompt::translation(&request)?;
+        let text = self.complete(completion, generation).await?;
+        Ok(prompt::translations("local", &text, &request.segments)?)
+    }
 
-        let image = request.image.clone();
+    /// Runs one structured-output request and returns the raw JSON text.
+    pub(crate) async fn complete(
+        &self,
+        completion: Completion,
+        generation: GenerationConfig,
+    ) -> Result<String> {
         let prompt = self.render_prompt(
-            &request,
+            &completion,
             generation.reasoning.unwrap_or(false) && self.descriptor.reasoning,
         )?;
-        let schema = prompt::output_schema(expected);
         let llm = Arc::clone(&self.llm);
         let generation = self.descriptor.generation.options(generation);
+        let Completion { image, schema, .. } = completion;
         let output = tokio_rayon::spawn(move || {
             let input = image.as_deref().map_or_else(
                 || Input::new(&prompt),
@@ -89,27 +99,28 @@ impl LocalTranslator {
             llm.inference_with_json_schema(&input, &generation, &schema)
         })
         .await?;
-        let segments = prompt::translations("local", &output.text, &request.segments)?;
-        Ok(segments)
+        Ok(output.text)
     }
 
-    fn render_prompt(&self, request: &TranslationRequest, reasoning: bool) -> Result<String> {
-        let (system, payload) = prompt::prompts(request)?;
-        let payload = if request.image.is_some() {
-            format!("{}\n{payload}", media_marker())
+    fn render_prompt(&self, completion: &Completion, reasoning: bool) -> Result<String> {
+        let payload = if completion.image.is_some() {
+            format!("{}\n{}", media_marker(), completion.user)
         } else {
-            payload
+            completion.user.clone()
         };
         Ok(self
             .llm
             .render_chat_prompt_with_options(
-                &[ChatMessage::system(system), ChatMessage::user(payload)],
+                &[
+                    ChatMessage::system(completion.system.clone()),
+                    ChatMessage::user(payload),
+                ],
                 ChatTemplateOptions {
                     add_generation_prompt: true,
                     enable_thinking: reasoning,
                 },
             )
-            .context("failed to render local translation prompt")?)
+            .context("failed to render local model prompt")?)
     }
 }
 

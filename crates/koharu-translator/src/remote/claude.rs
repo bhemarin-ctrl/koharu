@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image, prompt,
+    GenerationConfig, Model, Provider, Result, backend::encode_image, prompt::Completion,
 };
 
 const URL: &str = "https://api.anthropic.com/v1/messages";
@@ -49,20 +49,20 @@ pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
         .collect())
 }
 
-pub(super) async fn translate(
+pub(super) async fn complete(
     client: &Client,
     _config: &ClaudeConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    completion: &Completion,
+) -> Result<String> {
     let api_key = koharu_secrets::get("claude")?.context("claude API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
+    let (system, user) = (completion.system.clone(), completion.user.clone());
     let body = Request {
         model,
         max_tokens: generation.max_tokens.unwrap_or(8192),
         system: &system,
-        messages: [Message::user(&user, request.image.as_deref())?],
+        messages: [Message::user(&user, completion.image.as_deref())?],
         temperature: generation.temperature,
         thinking: generation.reasoning.map(|enabled| ThinkingConfig {
             kind: if enabled { "adaptive" } else { "disabled" },
@@ -70,7 +70,7 @@ pub(super) async fn translate(
         output_config: OutputConfig {
             format: JsonOutputFormat {
                 kind: "json_schema",
-                schema: prompt::output_schema(request.segments.len()),
+                schema: completion.schema.clone(),
             },
         },
     };
@@ -88,7 +88,7 @@ pub(super) async fn translate(
         .into_iter()
         .find_map(|block| (block.kind == "text").then_some(block.text).flatten())
         .context("Claude returned no text content")?;
-    Ok(prompt::translations("claude", &text, &request.segments)?)
+    Ok(text)
 }
 
 #[derive(Serialize)]
@@ -234,7 +234,7 @@ mod tests {
             output_config: OutputConfig {
                 format: JsonOutputFormat {
                     kind: "json_schema",
-                    schema: prompt::output_schema(2),
+                    schema: crate::prompt::output_schema(2),
                 },
             },
         };

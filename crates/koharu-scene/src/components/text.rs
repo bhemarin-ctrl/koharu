@@ -189,6 +189,55 @@ impl Component for Translation {
     }
 }
 
+/// What happens on a page, in prose, kept on the page entity as translation
+/// context. It is analysis of the page, never visible text.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+pub struct SceneSummary {
+    pub text: Authored<String>,
+}
+
+impl Revisioned for SceneSummary {
+    fn revision() -> u16 {
+        1
+    }
+}
+
+impl SerializeRevisioned for SceneSummary {
+    fn serialize_revisioned<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<(), revision::Error> {
+        self.text.serialize_revisioned(writer)
+    }
+}
+
+impl DeserializeRevisioned for SceneSummary {
+    fn deserialize_revisioned<R: std::io::Read>(
+        reader: &mut R,
+    ) -> std::result::Result<Self, revision::Error> {
+        Ok(Self {
+            text: Authored::deserialize_revisioned(reader)?,
+        })
+    }
+}
+
+impl Component for SceneSummary {
+    const KIND: &'static str = "dev.koharu.page.scene-summary";
+
+    fn validate(&self, _context: &ValidationContext<'_>) -> Result<()> {
+        validate_authored_text(&self.text)
+    }
+
+    fn origin(&self) -> Option<&Origin> {
+        Some(&self.text.origin)
+    }
+
+    fn set_origin(&mut self, origin: Origin) -> bool {
+        self.text.origin = origin;
+        true
+    }
+}
+
 fn validate_authored_text(value: &Authored<String>) -> Result<()> {
     if value.value.len() > 16 * 1024 * 1024 || value.value.contains('\0') {
         return Err(Error::invalid("text is too large or contains NUL"));

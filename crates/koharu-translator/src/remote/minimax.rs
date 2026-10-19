@@ -7,7 +7,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::send_json;
-use crate::{GenerationConfig, Model, Provider, Result, TranslationRequest, display_name, prompt};
+use crate::{GenerationConfig, Model, Provider, Result, display_name, prompt::Completion};
 
 // MiniMax recommends compatibility APIs, but this provider intentionally uses its native route.
 const URL: &str = "https://api.minimax.io/v1/text/chatcompletion_v2";
@@ -40,15 +40,15 @@ pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
         .collect())
 }
 
-pub(super) async fn translate(
+pub(super) async fn complete(
     client: &Client,
     _config: &MiniMaxConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    completion: &Completion,
+) -> Result<String> {
     let api_key = koharu_secrets::get("minimax")?.context("minimax API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
+    let (system, user) = (completion.system.clone(), completion.user.clone());
     let response: Response = send_json(
         "minimax",
         client
@@ -69,7 +69,7 @@ pub(super) async fn translate(
                 temperature: generation.temperature,
                 top_p: generation.top_p,
                 max_completion_tokens: generation.max_tokens,
-                response_format: response_format(model, request.segments.len()),
+                response_format: response_format(model, completion),
             }),
     )
     .await?;
@@ -88,7 +88,7 @@ pub(super) async fn translate(
         .context("MiniMax returned no choices")?
         .message
         .content;
-    Ok(prompt::translations("minimax", &text, &request.segments)?)
+    Ok(text)
 }
 
 #[derive(Serialize)]
@@ -119,13 +119,13 @@ struct JsonSchema {
     schema: serde_json::Value,
 }
 
-fn response_format(model: &str, expected: usize) -> Option<ResponseFormat> {
+fn response_format(model: &str, completion: &Completion) -> Option<ResponseFormat> {
     (model == "MiniMax-Text-01").then(|| ResponseFormat {
         kind: "json_schema",
         json_schema: JsonSchema {
-            name: "manga_translation",
+            name: completion.name,
             strict: true,
-            schema: prompt::output_schema(expected),
+            schema: completion.schema.clone(),
         },
     })
 }
@@ -175,6 +175,14 @@ struct BaseResponse {
 mod tests {
     use super::*;
 
+    fn completion(segments: usize) -> Completion {
+        crate::prompt::translation(&crate::TranslationRequest::new(
+            vec!["text"; segments],
+            crate::Language::English,
+        ))
+        .unwrap()
+    }
+
     #[test]
     fn serializes_native_completion_fields() {
         let body = Request {
@@ -192,7 +200,7 @@ mod tests {
             temperature: Some(0.7),
             top_p: Some(0.95),
             max_completion_tokens: Some(1024),
-            response_format: response_format("MiniMax-M3", 2),
+            response_format: response_format("MiniMax-M3", &completion(2)),
         };
         let value = serde_json::to_value(body).unwrap();
         assert_eq!(value["model"], "MiniMax-M3");
@@ -219,7 +227,7 @@ mod tests {
             temperature: None,
             top_p: None,
             max_completion_tokens: None,
-            response_format: response_format("MiniMax-Text-01", 2),
+            response_format: response_format("MiniMax-Text-01", &completion(2)),
         };
         let value = serde_json::to_value(body).unwrap();
 

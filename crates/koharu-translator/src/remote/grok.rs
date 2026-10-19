@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image,
-    display_name, prompt,
+    GenerationConfig, Model, Provider, Result, backend::encode_image,
+    display_name, prompt::Completion,
 };
 
 const RESPONSES_URL: &str = "https://api.x.ai/v1/responses";
@@ -19,20 +19,20 @@ const MODELS_URL: &str = "https://api.x.ai/v1/language-models";
 #[serde(default)]
 pub struct GrokConfig {}
 
-pub(super) async fn translate(
+pub(super) async fn complete(
     client: &Client,
     _config: &GrokConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    completion: &Completion,
+) -> Result<String> {
     let api_key = koharu_secrets::get("grok")?.context("grok API key is not configured")?;
     let response: Response = send_json(
         "grok",
         client
             .post(RESPONSES_URL)
             .bearer_auth(api_key.expose_secret())
-            .json(&request_body(model, generation, request)?),
+            .json(&request_body(model, generation, completion)?),
     )
     .await?;
     let text = response
@@ -45,7 +45,7 @@ pub(super) async fn translate(
                 .flatten()
         })
         .context("Grok returned no output text")?;
-    Ok(prompt::translations("grok", &text, &request.segments)?)
+    Ok(text)
 }
 
 pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
@@ -77,10 +77,10 @@ pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
 fn request_body<'a>(
     model: &'a str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
+    completion: &'a Completion,
 ) -> anyhow::Result<Request<'a>> {
-    let (system, user) = prompt::prompts(request)?;
-    let user_content = match request.image.as_deref() {
+    let (system, user) = (completion.system.clone(), completion.user.clone());
+    let user_content = match completion.image.as_deref() {
         Some(image) => InputContent::Parts(vec![
             InputPart::Text { text: user },
             InputPart::Image {
@@ -112,9 +112,9 @@ fn request_body<'a>(
         text: TextConfig {
             format: TextFormat {
                 kind: "json_schema",
-                name: "manga_translation",
+                name: completion.name,
                 strict: true,
-                schema: prompt::output_schema(request.segments.len()),
+                schema: completion.schema.clone(),
             },
         },
     })
@@ -212,8 +212,9 @@ mod tests {
 
     #[test]
     fn serializes_responses_schema_and_image_input() {
-        let request = TranslationRequest::new(["hello"], crate::Language::Japanese)
+        let request = crate::TranslationRequest::new(["hello"], crate::Language::Japanese)
             .with_image(std::sync::Arc::new(image::DynamicImage::new_rgb8(1, 1)));
+        let completion = crate::prompt::translation(&request).unwrap();
         let body = request_body(
             "grok-4.5",
             &GenerationConfig {
@@ -221,7 +222,7 @@ mod tests {
                 reasoning: Some(true),
                 ..GenerationConfig::default()
             },
-            &request,
+            &completion,
         )
         .unwrap();
         let value = serde_json::to_value(body).unwrap();

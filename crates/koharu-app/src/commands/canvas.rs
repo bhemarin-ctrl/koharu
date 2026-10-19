@@ -360,6 +360,7 @@ pub(crate) async fn commit_inpaint(
             koharu_pipeline::Operation::Only {
                 stage: koharu_pipeline::Stage::Inpainting,
             },
+            None,
             handle.state::<CurrentProject>(),
             handle.state::<Processing>(),
             handle.state::<JobChannel>(),

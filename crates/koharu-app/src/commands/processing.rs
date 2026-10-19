@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt,
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use anyhow::{Context as _, Result};
 use koharu_pipeline::{Committer, Progress, RunStatus, StageOutput, StopToken};
@@ -47,6 +52,9 @@ pub struct Job {
     pub page: Option<koharu_scene::EntityId>,
     pub stage: Option<koharu_pipeline::Stage>,
     pub model: Option<String>,
+    /// While a paced batch pauses between pages, when the next page starts,
+    /// in milliseconds since the Unix epoch.
+    pub resumes_at: Option<f64>,
     pub error: Option<String>,
 }
 
@@ -78,6 +86,7 @@ pub(crate) async fn process(
     handle: AppHandle<CefRuntime>,
     scope: koharu_pipeline::Scope,
     operation: koharu_pipeline::Operation,
+    page_interval_seconds: Option<u32>,
     project: State<'_, CurrentProject>,
     processing: State<'_, Processing>,
     job_channel: State<'_, JobChannel>,
@@ -106,6 +115,7 @@ pub(crate) async fn process(
         page: None,
         stage: None,
         model: None,
+        resumes_at: None,
         error: None,
     };
     processing.jobs.lock().insert(id, job.clone());
@@ -123,42 +133,79 @@ pub(crate) async fn process(
             stop: stop.clone(),
             progress: None,
             inpainting_mask,
+            page_interval: page_interval_seconds
+                .filter(|seconds| *seconds > 0)
+                .map(|seconds| Duration::from_secs(u64::from(seconds))),
         };
         request.progress = Some(Arc::new(move |event| {
             let update = match event {
                 Progress::Started { pages, stages } => {
                     let mut progress = progress.lock();
                     *progress = (0, pages.len().saturating_mul(stages.len()));
-                    Some((0, progress.1, None, None, None))
+                    Some(JobUpdate::step(0, progress.1, None, None, None))
                 }
                 Progress::Loading { page, stage, model } => {
                     let progress = progress.lock();
-                    Some((progress.0, progress.1, Some(page), Some(stage), Some(model)))
+                    Some(JobUpdate::step(
+                        progress.0,
+                        progress.1,
+                        Some(page),
+                        Some(stage),
+                        Some(model),
+                    ))
                 }
                 Progress::Finished {
                     page, stage, model, ..
                 } => {
                     let mut progress = progress.lock();
                     progress.0 = progress.0.saturating_add(1).min(progress.1);
-                    Some((progress.0, progress.1, Some(page), Some(stage), Some(model)))
+                    Some(JobUpdate::step(
+                        progress.0,
+                        progress.1,
+                        Some(page),
+                        Some(stage),
+                        Some(model),
+                    ))
                 }
                 Progress::Skipped { page, stage } => {
                     let mut progress = progress.lock();
                     progress.0 = progress.0.saturating_add(1).min(progress.1);
-                    Some((progress.0, progress.1, Some(page), Some(stage), None))
+                    Some(JobUpdate::step(
+                        progress.0,
+                        progress.1,
+                        Some(page),
+                        Some(stage),
+                        None,
+                    ))
+                }
+                Progress::Waiting { next, remaining } => {
+                    let progress = progress.lock();
+                    let resumes_at = (SystemTime::now() + remaining)
+                        .duration_since(UNIX_EPOCH)
+                        .map(|time| time.as_secs_f64() * 1000.0)
+                        .ok();
+                    Some(JobUpdate {
+                        completed: progress.0,
+                        total: progress.1,
+                        page: Some(next),
+                        stage: None,
+                        model: None,
+                        resumes_at,
+                    })
                 }
                 Progress::Running { .. } => None,
             };
-            if let Some((completed, total, page, stage, model)) = update {
+            if let Some(update) = update {
                 let job = {
                     let processing = progress_handle.state::<Processing>();
                     let mut jobs = processing.jobs.lock();
                     jobs.get_mut(&id).map(|job| {
-                        job.completed = completed;
-                        job.total = total;
-                        job.page = page;
-                        job.stage = stage;
-                        job.model = model;
+                        job.completed = update.completed;
+                        job.total = update.total;
+                        job.page = update.page;
+                        job.stage = update.stage;
+                        job.model = update.model;
+                        job.resumes_at = update.resumes_at;
                         job.clone()
                     })
                 };
@@ -228,6 +275,34 @@ pub(crate) async fn process(
         }
     }));
     Ok(id)
+}
+
+struct JobUpdate {
+    completed: usize,
+    total: usize,
+    page: Option<koharu_scene::EntityId>,
+    stage: Option<koharu_pipeline::Stage>,
+    model: Option<String>,
+    resumes_at: Option<f64>,
+}
+
+impl JobUpdate {
+    fn step(
+        completed: usize,
+        total: usize,
+        page: Option<koharu_scene::EntityId>,
+        stage: Option<koharu_pipeline::Stage>,
+        model: Option<String>,
+    ) -> Self {
+        Self {
+            completed,
+            total,
+            page,
+            stage,
+            model,
+            resumes_at: None,
+        }
+    }
 }
 
 #[tauri::command]

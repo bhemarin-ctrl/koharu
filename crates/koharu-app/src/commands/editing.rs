@@ -138,6 +138,27 @@ pub(crate) async fn set_translation(
 
 #[tauri::command]
 #[specta::specta]
+pub(crate) async fn set_scene_summary(
+    page: EntityId,
+    text: Option<String>,
+    desktop: State<'_, Desktop>,
+    project: State<'_, CurrentProject>,
+    canvas_channel: State<'_, CanvasChannel>,
+) -> Result<(), Error> {
+    let (commit, active) = {
+        let mut project = project.project.lock().await;
+        let project = project.as_mut().context("no project is open")?;
+        let commit = project.set_scene_summary(page, text).await?;
+        project.record_commit(&commit);
+        (commit, project.active_page())
+    };
+    let canvas = synchronize_canvas(&desktop, &commit, active).await?;
+    canvas_channel.channel.publish(canvas);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub(crate) async fn set_typography(
     updates: Vec<TypographyUpdate>,
     desktop: State<'_, Desktop>,

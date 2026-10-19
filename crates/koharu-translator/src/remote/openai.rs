@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image,
-    display_name, prompt,
+    GenerationConfig, Model, Provider, Result, backend::encode_image,
+    display_name, prompt::Completion,
 };
 
 const URL: &str = "https://api.openai.com/v1/chat/completions";
@@ -70,16 +70,16 @@ fn supports_translation(id: &str) -> bool {
     supported_family && !incompatible
 }
 
-pub(super) async fn translate(
+pub(super) async fn complete(
     client: &Client,
     _config: &OpenAiConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    completion: &Completion,
+) -> Result<String> {
     let api_key = koharu_secrets::get("openai")?.context("openai API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
-    let user_content = match request.image.as_deref() {
+    let (system, user) = (completion.system.clone(), completion.user.clone());
+    let user_content = match completion.image.as_deref() {
         Some(image) => MessageContent::Parts(vec![
             ContentPart::Text { text: user },
             ContentPart::ImageUrl {
@@ -113,9 +113,9 @@ pub(super) async fn translate(
         response_format: ResponseFormat {
             kind: "json_schema",
             json_schema: JsonSchema {
-                name: "manga_translation",
+                name: completion.name,
                 strict: true,
-                schema: prompt::output_schema(request.segments.len()),
+                schema: completion.schema.clone(),
             },
         },
     };
@@ -135,7 +135,7 @@ pub(super) async fn translate(
         .message
         .content
         .context("OpenAI returned no message content")?;
-    Ok(prompt::translations("openai", &text, &request.segments)?)
+    Ok(text)
 }
 
 #[derive(Serialize)]
@@ -261,7 +261,7 @@ mod tests {
                 json_schema: JsonSchema {
                     name: "manga_translation",
                     strict: true,
-                    schema: prompt::output_schema(2),
+                    schema: crate::prompt::output_schema(2),
                 },
             },
         };

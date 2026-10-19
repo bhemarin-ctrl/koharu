@@ -105,6 +105,7 @@ impl Arguments {
                 OcrChoice::BaberuOcr => OcrModel::BaberuOcr,
                 OcrChoice::HayaiOcr => OcrModel::HayaiOcr,
             },
+            summary: Default::default(),
             translation: TranslationConfig {
                 model: ModelSelection {
                     provider: Provider::Local,

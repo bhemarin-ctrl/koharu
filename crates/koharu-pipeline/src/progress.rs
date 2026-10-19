@@ -29,6 +29,11 @@ pub enum Progress {
         page: EntityId,
         stage: Stage,
     },
+    /// The batch is pausing between pages; `next` starts after `remaining`.
+    Waiting {
+        next: EntityId,
+        remaining: std::time::Duration,
+    },
 }
 
 pub type ProgressSink = Arc<dyn Fn(Progress) + Send + Sync>;

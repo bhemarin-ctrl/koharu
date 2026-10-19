@@ -1,13 +1,18 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use koharu_scene::{Authored, LanguageTag, Origin, SourceText, Translation};
-use koharu_translator::{TranslationRequest, Translator};
+use koharu_scene::{
+    Authored, EntityId, LanguageTag, Origin, SceneSummary, Snapshot, SourceText, Translation,
+};
+use koharu_translator::{TranslationContext, TranslationRequest, Translator};
 
 use crate::TranslationConfig;
 
-use super::{StageInput, StageProcessor, finish, generation};
+use super::{StageInput, StageProcessor, finish, generation, page_sources};
 
 const PRODUCER: &str = "dev.koharu.pipeline.translation";
+
+/// How many earlier pages a translation reads for dialogue and scene memory.
+const MEMORY_PAGES: usize = 3;
 
 pub(super) struct Processor {
     config: TranslationConfig,
@@ -50,10 +55,18 @@ impl StageProcessor for Processor {
                 }
             }
         }
+        let (previous_scenes, context) = page_memory(&input.scene, input.page)?;
         let mut request = TranslationRequest::new(
             targets.iter().map(|(_, source)| source.clone()),
             self.config.target_language,
-        );
+        )
+        .with_previous_scenes(previous_scenes)
+        .with_context(context);
+        if let Some(summary) = input.scene.component::<SceneSummary>(input.page)?
+            && !summary.text.value.trim().is_empty()
+        {
+            request = request.with_scene(summary.text.value);
+        }
         if let Some(instructions) = self.config.instructions.as_deref() {
             request = request.with_instructions(instructions);
         }
@@ -95,5 +108,110 @@ impl StageProcessor for Processor {
             )?;
         }
         finish(edit)
+    }
+}
+
+/// Scene summaries and translated dialogue of the pages right before `page`,
+/// oldest first, so consecutive pages read as one conversation.
+fn page_memory(scene: &Snapshot, page: EntityId) -> Result<(Vec<String>, Vec<TranslationContext>)> {
+    let pages = scene.pages().map(|page| page.id()).collect::<Vec<_>>();
+    let Some(position) = pages.iter().position(|candidate| *candidate == page) else {
+        return Ok((Vec::new(), Vec::new()));
+    };
+    let mut scenes = Vec::new();
+    let mut context = Vec::new();
+    for previous in &pages[position.saturating_sub(MEMORY_PAGES)..position] {
+        if let Some(summary) = scene.component::<SceneSummary>(*previous)?
+            && !summary.text.value.trim().is_empty()
+        {
+            scenes.push(summary.text.value);
+        }
+        for (content, source) in page_sources(scene, *previous)? {
+            if let Some(translation) = scene.component::<Translation>(content)?
+                && !translation.text.value.trim().is_empty()
+            {
+                context.push(TranslationContext::new(source, translation.text.value));
+            }
+        }
+    }
+    Ok((scenes, context))
+}
+
+#[cfg(test)]
+mod tests {
+    use koharu_scene::{At, PageDraft, Session, TextLayout, TextLayoutKind};
+
+    use super::*;
+
+    fn text(edit: &mut koharu_scene::Edit, page: EntityId, source: &str, translation: &str) {
+        let content = edit.add_text_content(page, At::End).unwrap();
+        edit.add_text_layer(
+            page,
+            At::End,
+            content,
+            &TextLayout {
+                origin: Origin::User,
+                kind: TextLayoutKind::Paragraph,
+                angle_degrees: None,
+            },
+        )
+        .unwrap();
+        edit.set(
+            content,
+            &SourceText {
+                text: Authored::user(source.to_owned()),
+                language: None,
+            },
+        )
+        .unwrap();
+        if !translation.is_empty() {
+            edit.set(
+                content,
+                &Translation {
+                    text: Authored::user(translation.to_owned()),
+                    language: None,
+                },
+            )
+            .unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn memory_reads_earlier_pages_in_reading_order() {
+        let mut session = Session::memory().await.unwrap();
+        let mut pages = Vec::new();
+        let patch = session
+            .snapshot()
+            .patch(|edit| {
+                for label in ["1", "2", "3"] {
+                    pages.push(edit.add_page(PageDraft::new(label, 1.0, 1.0), At::End)?);
+                }
+                edit.set(
+                    pages[0],
+                    &SceneSummary {
+                        text: Authored::user("A forest at night.".to_owned()),
+                    },
+                )?;
+                text(edit, pages[0], "自分の生きた証を", "Proof that I lived...");
+                text(edit, pages[0], "この世界に", "I want to leave it in this world!");
+                text(edit, pages[1], "未翻訳", "");
+                text(edit, pages[2], "今", "Now");
+                Ok(())
+            })
+            .unwrap();
+        let scene = session.commit(patch).await.unwrap().snapshot;
+
+        let (scenes, context) = page_memory(&scene, pages[2]).unwrap();
+        assert_eq!(scenes, ["A forest at night."]);
+        assert_eq!(
+            context,
+            [
+                TranslationContext::new("自分の生きた証を", "Proof that I lived..."),
+                TranslationContext::new("この世界に", "I want to leave it in this world!"),
+            ]
+        );
+
+        let (scenes, context) = page_memory(&scene, pages[0]).unwrap();
+        assert!(scenes.is_empty() && context.is_empty());
     }
 }

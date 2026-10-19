@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, TranslationRequest, backend::encode_image, prompt,
+    GenerationConfig, Model, Provider, Result, backend::encode_image, prompt::Completion,
 };
 
 const CHAT_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
@@ -21,17 +21,17 @@ const MODELS_URL: &str = "https://openrouter.ai/api/v1/models";
 #[serde(default)]
 pub struct OpenRouterConfig {}
 
-pub(super) async fn translate(
+pub(super) async fn complete(
     client: &Client,
     _config: &OpenRouterConfig,
     model: &str,
     generation: &GenerationConfig,
-    request: &TranslationRequest,
-) -> Result<Vec<String>> {
+    completion: &Completion,
+) -> Result<String> {
     let api_key =
         koharu_secrets::get("openrouter")?.context("openrouter API key is not configured")?;
-    let (system, user) = prompt::prompts(request)?;
-    let user_content = match request.image.as_deref() {
+    let (system, user) = (completion.system.clone(), completion.user.clone());
+    let user_content = match completion.image.as_deref() {
         Some(image) => MessageContent::Parts(vec![
             ContentPart::Text { text: user },
             ContentPart::ImageUrl {
@@ -65,9 +65,9 @@ pub(super) async fn translate(
         response_format: ResponseFormat {
             kind: "json_schema",
             json_schema: JsonSchema {
-                name: "manga_translation",
+                name: completion.name,
                 strict: true,
-                schema: prompt::output_schema(request.segments.len()),
+                schema: completion.schema.clone(),
             },
         },
         provider: ProviderPreferences {
@@ -90,11 +90,7 @@ pub(super) async fn translate(
         .message
         .content
         .context("OpenRouter returned no message content")?;
-    Ok(prompt::translations(
-        "openrouter",
-        &text,
-        &request.segments,
-    )?)
+    Ok(text)
 }
 
 pub(super) async fn models(client: &Client) -> Result<Vec<Model>> {
@@ -295,7 +291,7 @@ mod tests {
                 json_schema: JsonSchema {
                     name: "manga_translation",
                     strict: true,
-                    schema: prompt::output_schema(2),
+                    schema: crate::prompt::output_schema(2),
                 },
             },
             provider: ProviderPreferences {
