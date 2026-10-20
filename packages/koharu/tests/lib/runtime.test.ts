@@ -28,6 +28,7 @@ const preferences: Preferences = {
   pipeline: {
     detection: { model: 'koharu-layout-rfdetr-seg-2xl' },
     ocr: { model: 'paddleocr-vl-1.6' },
+    summary: {},
     translation: {
       model: {
         provider: 'local',
@@ -125,6 +126,7 @@ describe('Tauri runtime', () => {
         stage: 'detection',
         model: 'model',
         error: null,
+        resumes_at: null,
       })
     })
 
@@ -190,6 +192,7 @@ describe('Tauri runtime', () => {
       stage: 'ocr',
       model: 'model',
       error: null,
+      resumes_at: null,
     })
 
     expect(await screen.findByText('Book')).toBeInTheDocument()

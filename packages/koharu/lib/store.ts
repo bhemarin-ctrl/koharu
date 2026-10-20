@@ -37,7 +37,16 @@ export type InspectorSection = 'copy' | 'type' | 'layers'
 export type ShortcutAction = CanvasTool | 'fit'
 export type Shortcuts = Record<ShortcutAction, string>
 export type PipelineScope = 'page' | 'selected-pages' | 'project'
-export const pipelineStages: readonly Stage[] = ['detection', 'ocr', 'translation', 'inpainting']
+export const pipelineStages: readonly Stage[] = [
+  'detection',
+  'ocr',
+  'summary',
+  'translation',
+  'inpainting',
+]
+/** Pause between pages when several pages are processed, in seconds. */
+export const DEFAULT_PAGE_INTERVAL_SECONDS = 60
+const PAGE_INTERVAL_KEY = 'koharu.pageIntervalSeconds'
 
 interface KoharuStore {
   initialized: boolean
@@ -60,12 +69,16 @@ interface KoharuStore {
   inspector: InspectorSection
   processingScope: PipelineScope
   processingStages: Stage[]
+  pageIntervalSeconds: number
+  batchOpen: boolean
   settingsOpen: boolean
   shortcuts: Shortcuts
   selectPages: (pages: EntityId[]) => void
   showInspector: (section: InspectorSection) => void
   setProcessingScope: (scope: PipelineScope) => void
   setProcessingStages: (stages: Stage[]) => void
+  setPageIntervalSeconds: (seconds: number) => void
+  setBatchOpen: (open: boolean) => void
   setSettingsOpen: (open: boolean) => void
   selectLayers: (layers: EntityId[]) => void
   setTool: (tool: CanvasTool) => void
@@ -108,12 +121,24 @@ export const useKoharuStore = create<KoharuStore>()((set) => ({
   inspector: 'copy',
   processingScope: 'selected-pages',
   processingStages: [...pipelineStages],
+  pageIntervalSeconds: storedPageInterval(),
+  batchOpen: false,
   settingsOpen: false,
   shortcuts: defaultShortcuts,
   selectPages: (selectedPages) => set({ selectedPages: [...new Set(selectedPages)] }),
   showInspector: (inspector) => set({ inspector }),
   setProcessingScope: (processingScope) => set({ processingScope }),
   setProcessingStages: (processingStages) => set({ processingStages }),
+  setPageIntervalSeconds: (seconds) => {
+    const pageIntervalSeconds = Math.max(0, Math.round(seconds))
+    try {
+      localStorage.setItem(PAGE_INTERVAL_KEY, String(pageIntervalSeconds))
+    } catch {
+      // The interval is a convenience; without storage it resets to the default.
+    }
+    set({ pageIntervalSeconds })
+  },
+  setBatchOpen: (batchOpen) => set({ batchOpen }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   selectLayers: (selectedLayers) => set({ selectedLayers: [...new Set(selectedLayers)] }),
   setTool: (tool) => set({ tool }),
@@ -189,6 +214,17 @@ function canvasSnapshot(canvas: CanvasState) {
       canvas.element_frames.map(({ element, frame }) => [element, frame]),
     ),
   }
+}
+
+function storedPageInterval(): number {
+  try {
+    const stored = Number(localStorage.getItem(PAGE_INTERVAL_KEY))
+    if (localStorage.getItem(PAGE_INTERVAL_KEY) !== null && Number.isFinite(stored) && stored >= 0)
+      return stored
+  } catch {
+    // Storage can be unavailable; fall back to the default.
+  }
+  return DEFAULT_PAGE_INTERVAL_SECONDS
 }
 
 function byId<T extends { id: string | number }>(items: T[]): Record<string, T> {

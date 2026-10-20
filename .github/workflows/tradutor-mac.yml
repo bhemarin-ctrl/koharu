@@ -1,0 +1,80 @@
+name: Instalador Mac
+
+# Builds this fork for Apple Silicon Macs and publishes the .dmg as a
+# GitHub release of the fork, so it can be downloaded from the Releases page.
+# The app is signed ad hoc (no Apple developer account), so macOS asks for
+# confirmation the first time it opens.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['traducao-contexto']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mac-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: koharu-tradutor-mac
+
+      - name: Install macOS CEF helper targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: macos-bun-${{ hashFiles('**/bun.lock') }}
+
+      - run: bun install
+
+      # The command bindings are generated from the Rust commands; regenerate
+      # them so the interface is built against exactly what the app exposes.
+      - name: Regenerate command bindings
+        run: cargo run --release --target aarch64-apple-darwin -p koharu-app --bin generate
+
+      - name: Build the app
+        run: >-
+          cargo tauri build --target aarch64-apple-darwin --bundles app,dmg
+          --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"signingIdentity":"-"}}}'
+
+      - name: Keep the installer as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: koharu-mac
+          path: target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          retention-days: 30
+
+      - name: Publish the installer as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="tradutor-${{ github.run_number }}"
+          gh release create "$tag" target/aarch64-apple-darwin/release/bundle/dmg/*.dmg \
+            --target "${{ github.sha }}" \
+            --title "Koharu com tradução por contexto #${{ github.run_number }}" \
+            --notes "Instalador para Mac com Apple Silicon (M1 ou mais novo). Na primeira abertura, o macOS pede confirmação: clique com o botão direito no app e escolha Abrir, ou vá em Ajustes do Sistema > Privacidade e Segurança > Abrir Mesmo Assim."
+
+      - name: Keep the regenerated bindings
+        run: |
+          if ! git diff --quiet -- packages/bridge/src/protocol.ts; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore: regenerate command bindings" -- packages/bridge/src/protocol.ts
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi

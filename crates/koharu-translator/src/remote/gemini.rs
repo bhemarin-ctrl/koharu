@@ -11,8 +11,8 @@ use url::Url;
 
 use super::send_json;
 use crate::{
-    GenerationConfig as TranslationGeneration, Model, Provider, Result,
-    backend::encode_image, prompt::Completion,
+    GenerationConfig as TranslationGeneration, Model, Provider, Result, backend::encode_image,
+    prompt::Completion,
 };
 
 const ROOT: &str = "https://generativelanguage.googleapis.com/v1beta/models";

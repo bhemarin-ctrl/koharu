@@ -19,6 +19,7 @@ import { CanvasCommandBar } from '@/components/editor/CanvasCommandBar'
 import { Inspector } from '@/components/editor/Inspector'
 import { PageRail } from '@/components/editor/PageRail'
 import { ResourceMonitor } from '@/components/editor/ResourceMonitor'
+import { StageRail } from '@/components/editor/StageRail'
 import { StatusBar } from '@/components/editor/StatusBar'
 import { ToolBar } from '@/components/editor/ToolBar'
 import { ProviderPreferences } from '@/components/preferences/ProviderPreferences'
@@ -137,6 +138,7 @@ const preferences: Preferences = {
   pipeline: {
     detection: { model: 'koharu-layout-rfdetr-seg-2xl' },
     ocr: { model: 'paddleocr-vl-1.6' },
+    summary: {},
     translation: {
       model: {
         provider: 'local',
@@ -195,6 +197,7 @@ function installProject() {
     size: { width: 1000, height: 1500 },
     layers: [textLayer],
     regions: [],
+    scene_summary: null,
   }
   queryClient.setQueryData(projectKey, {
     name: 'Book',
@@ -482,13 +485,21 @@ describe('greenfield editor', () => {
   it('keeps rapid page switches on the latest native selection', async () => {
     installProject()
     const pages = [
-      { id: 'page', label: 'Page 1', size: { width: 1000, height: 1500 }, layers: [], regions: [] },
+      {
+        id: 'page',
+        label: 'Page 1',
+        size: { width: 1000, height: 1500 },
+        layers: [],
+        regions: [],
+        scene_summary: null,
+      },
       {
         id: 'page-2',
         label: 'Page 2',
         size: { width: 1000, height: 1500 },
         layers: [],
         regions: [],
+        scene_summary: null,
       },
       {
         id: 'page-3',
@@ -496,6 +507,7 @@ describe('greenfield editor', () => {
         size: { width: 1000, height: 1500 },
         layers: [],
         regions: [],
+        scene_summary: null,
       },
     ]
     queryClient.setQueryData(
@@ -599,6 +611,7 @@ describe('greenfield editor', () => {
       size: { width: 1000, height: 1500 },
       layers: [],
       regions: [],
+      scene_summary: null,
     }
     queryClient.setQueryData(pagesKey, [
       ...(queryClient.getQueryData<PageSummary[]>(pagesKey) ?? []),
@@ -632,6 +645,7 @@ describe('greenfield editor', () => {
       size: { width: 1000, height: 1500 },
       layers: [],
       regions: [],
+      scene_summary: null,
     }
     queryClient.setQueryData(pagesKey, [
       ...(queryClient.getQueryData<PageSummary[]>(pagesKey) ?? []),
@@ -1011,21 +1025,23 @@ describe('greenfield editor', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Processing settings' }))
     fireEvent.click(screen.getByRole('button', { name: /Scope Selection/ }))
     fireEvent.click(screen.getByRole('button', { name: /Entire project/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Stages 4 stages/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Stages 5 stages/ }))
     fireEvent.click(screen.getByRole('button', { name: /Translation/ }))
     fireEvent.click(screen.getByRole('button', { name: /Inpainting/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Run processing' }))
+    // Several pages run one at a time, pausing between pages.
     await waitFor(() =>
       expect(run).toHaveBeenLastCalledWith(
         { scope: 'project' },
-        { operation: 'stages', stages: ['detection', 'ocr'] },
+        { operation: 'stages', stages: ['detection', 'ocr', 'summary'] },
+        60,
       ),
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Processing settings' }))
     fireEvent.click(screen.getByRole('button', { name: /Scope Project/ }))
     fireEvent.click(screen.getByRole('button', { name: /Selected pages/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Stages 2 stages/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Stages 3 stages/ }))
     fireEvent.click(screen.getByRole('button', { name: /Translation/ }))
     fireEvent.click(screen.getByRole('button', { name: /Inpainting/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Run processing' }))
@@ -1033,8 +1049,38 @@ describe('greenfield editor', () => {
       expect(run).toHaveBeenLastCalledWith(
         { scope: 'pages', value: ['page'] },
         { operation: 'full' },
+        null,
       ),
     )
+  })
+
+  it('runs one step on the page on screen from the step rail', async () => {
+    installProject()
+    const run = vi.spyOn(commands, 'process').mockResolvedValue('job')
+    render(<StageRail />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Translation on this page' }))
+    await waitFor(() =>
+      expect(run).toHaveBeenLastCalledWith(
+        { scope: 'pages', value: ['page'] },
+        { operation: 'only', stage: 'translation' },
+        null,
+      ),
+    )
+  })
+
+  it('runs a batch one page at a time with the pause between pages', async () => {
+    installProject()
+    const run = vi.spyOn(commands, 'process').mockResolvedValue('job')
+    render(<StageRail />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Batch processing' }))
+    fireEvent.click(await screen.findByRole('radio', { name: /Entire project/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Start batch/ }))
+    await waitFor(() =>
+      expect(run).toHaveBeenLastCalledWith({ scope: 'project' }, { operation: 'full' }, 60),
+    )
+    expect(useKoharuStore.getState().batchOpen).toBe(false)
   })
 
   it('runs the selected pages by default and exposes the runtime shortcuts', async () => {
@@ -1047,6 +1093,7 @@ describe('greenfield editor', () => {
       expect(run).toHaveBeenLastCalledWith(
         { scope: 'pages', value: ['page'] },
         { operation: 'full' },
+        null,
       ),
     )
 
@@ -1058,7 +1105,7 @@ describe('greenfield editor', () => {
     await waitFor(() => expect(commands.getTranslationModels).toHaveBeenCalled())
     expect(screen.getByRole('button', { name: /Model Gemma 4 E2B Instruct/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Scope Selection/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stages 4 stages/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Stages 5 stages/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Output English/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     expect(useKoharuStore.getState().settingsOpen).toBe(true)
@@ -1141,7 +1188,7 @@ describe('greenfield editor', () => {
     await user.click(screen.getByRole('button', { name: 'Processing settings' }))
     await user.click(screen.getByRole('button', { name: /Scope Selection/ }))
     await user.click(screen.getByRole('button', { name: /Entire project/ }))
-    await user.click(screen.getByRole('button', { name: /Stages 4 stages/ }))
+    await user.click(screen.getByRole('button', { name: /Stages 5 stages/ }))
     await user.click(screen.getByRole('button', { name: /Translation/ }))
     await user.click(screen.getByRole('button', { name: /Inpainting/ }))
     await user.click(screen.getByRole('button', { name: 'Back' }))
@@ -1155,7 +1202,7 @@ describe('greenfield editor', () => {
     await user.click(screen.getByRole('button', { name: 'Processing settings' }))
 
     expect(screen.getByRole('button', { name: /Scope Project/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Stages 2 stages/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Stages 3 stages/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Output Japanese/ })).toBeInTheDocument()
   })
 
@@ -1806,6 +1853,7 @@ describe('greenfield editor', () => {
           stage: 'ocr',
           model: 'manga-ocr',
           error: null,
+          resumes_at: null,
         },
       },
     })

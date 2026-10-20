@@ -16,7 +16,9 @@
     "processing": "来勒处理",
     "processingFailed": "处理失败哉。",
     "stop": "停止",
-    "title": "活动"
+    "title": "活动",
+    "waiting": "页面之间歇一歇",
+    "nextPageIn": "下一页还有 {{time}}"
   },
   "agent": {
     "account": "ChatGPT 账户",
@@ -240,7 +242,8 @@
     "sourceLabel": "{{name}} 个原文",
     "textName": "文本 {{index}}",
     "title": "图层",
-    "translationLabel": "{{name}} 个译文"
+    "translationLabel": "{{name}} 个译文",
+    "readingOrder": "阅读顺序 {{number}}"
   },
   "menu": {
     "about": "关于",
@@ -312,13 +315,15 @@
     "detection": "检测",
     "inpainting": "修补",
     "ocr": "OCR",
-    "translation": "翻译"
+    "translation": "翻译",
+    "summary": "场景摘要"
   },
   "phaseDescription": {
     "detection": "寻出页面浪个文本。",
     "inpainting": "拿文字删脱仔，再重建原来文字底下个图稿。",
     "ocr": "读出每个区域里向个文本。",
-    "translation": "拿原文翻译成目标语言。"
+    "translation": "拿原文翻译成目标语言。",
+    "summary": "讲讲页面浪发生啥事体，帮翻译把方向。"
   },
   "providerDescriptions": {
     "caiyun": "Caiyun 翻译 API。",
@@ -534,5 +539,38 @@
     "maximize": "最大化",
     "minimize": "最小化",
     "restore": "还原"
+  },
+  "stageRail": {
+    "title": "步骤",
+    "batch": "批量处理",
+    "run": "辣辣迭页做{{stage}}",
+    "running": "{{stage}}来勒做",
+    "chooseModel": "拣{{stage}}个模型",
+    "sameAsTranslation": "搭翻译用同一个模型",
+    "sameAsTranslationDetail": "用翻译模型来讲页面",
+    "needsVision": "只有看得见图片个模型好讲页面。"
+  },
+  "summary": {
+    "title": "场景摘要",
+    "description": "翻译个辰光搭迭页一道送过去。改一改好纠正名字、啥人讲闲话或者语气。",
+    "generated": "模型写个",
+    "edited": "侬自家写个，批量处理会得保留",
+    "placeholder": "迭页浪发生啥事体…",
+    "clear": "清脱",
+    "regenerate": "再生成一趟",
+    "save": "保存",
+    "close": "关脱",
+    "view": "看场景摘要"
+  },
+  "batch": {
+    "title": "批量处理",
+    "description": "每页做完所有拣中个步骤，下一页再开始，搭一页一页做是一样个。",
+    "pages": "页面",
+    "steps": "步骤",
+    "pause": "页面之间歇一歇",
+    "pauseDetail": "页面之间让模型歇一歇，避免超出限额个错误。0 就是勿歇。",
+    "seconds": "秒",
+    "start": "开始批量处理",
+    "busy": "已经有处理来勒做了。"
   }
 }

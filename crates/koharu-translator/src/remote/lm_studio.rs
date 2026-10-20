@@ -10,8 +10,8 @@ use url::Url;
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, backend::encode_image,
-    display_name, prompt::Completion,
+    GenerationConfig, Model, Provider, Result, backend::encode_image, display_name,
+    prompt::Completion,
 };
 
 const DEFAULT_BASE_URL: &str = "http://localhost:1234";

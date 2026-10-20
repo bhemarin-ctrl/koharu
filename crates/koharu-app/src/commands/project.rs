@@ -8,9 +8,9 @@ use koharu_scene::{
     Geometry as SceneGeometry, Group as SceneGroup, Origin, PageDraft, Point as ScenePoint,
     Presents, RasterLayer as SceneRasterLayer, RasterLayerKind, Region as SceneRegion,
     RemovePolicy, Revision, SceneSummary as SceneSceneSummary, Session, Snapshot,
-    SourceText as SceneSourceText,
-    TextGroup as SceneTextGroup, TextLayout as SceneTextLayout, TextLayoutKind,
-    Translation as SceneTranslation, Typography as SceneTypography, Visibility as SceneVisibility,
+    SourceText as SceneSourceText, TextGroup as SceneTextGroup, TextLayout as SceneTextLayout,
+    TextLayoutKind, Translation as SceneTranslation, Typography as SceneTypography,
+    Visibility as SceneVisibility,
 };
 use serde::Serialize;
 use specta::Type;

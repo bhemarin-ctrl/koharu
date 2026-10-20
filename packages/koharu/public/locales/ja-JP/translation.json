@@ -16,7 +16,9 @@
     "processing": "処理中",
     "processingFailed": "処理に失敗しました。",
     "stop": "停止",
-    "title": "アクティビティ"
+    "title": "アクティビティ",
+    "waiting": "ページ間の待機",
+    "nextPageIn": "次のページまで {{time}}"
   },
   "agent": {
     "account": "ChatGPTアカウント",
@@ -240,7 +242,8 @@
     "sourceLabel": "{{name}}の原文",
     "textName": "テキスト {{index}}",
     "title": "レイヤー",
-    "translationLabel": "{{name}}の翻訳"
+    "translationLabel": "{{name}}の翻訳",
+    "readingOrder": "読み順 {{number}}"
   },
   "menu": {
     "about": "Koharuについて",
@@ -312,13 +315,15 @@
     "detection": "検出",
     "inpainting": "インペイント",
     "ocr": "OCR",
-    "translation": "翻訳"
+    "translation": "翻訳",
+    "summary": "シーン要約"
   },
   "phaseDescription": {
     "detection": "ページ上のテキストを見つけます。",
     "inpainting": "文字を消した部分の絵を復元します。",
     "ocr": "各領域内の原文を読み取ります。",
-    "translation": "原文を対象言語に翻訳します。"
+    "translation": "原文を対象言語に翻訳します。",
+    "summary": "翻訳の参考として、ページで起きていることを説明します。"
   },
   "providerDescriptions": {
     "caiyun": "Caiyun 翻訳 API。",
@@ -534,5 +539,38 @@
     "maximize": "最大化",
     "minimize": "最小化",
     "restore": "元のサイズに戻す"
+  },
+  "stageRail": {
+    "title": "工程",
+    "batch": "一括処理",
+    "run": "このページで{{stage}}",
+    "running": "{{stage}}を実行中",
+    "chooseModel": "{{stage}}のモデルを選択",
+    "sameAsTranslation": "翻訳と同じモデル",
+    "sameAsTranslationDetail": "翻訳モデルでページを説明します",
+    "needsVision": "画像を認識できるモデルだけがページを説明できます。"
+  },
+  "summary": {
+    "title": "シーン要約",
+    "description": "翻訳時にこのページと一緒に送られます。名前、話者、口調を直すには編集してください。",
+    "generated": "モデルが作成",
+    "edited": "あなたが作成（一括処理でも保持されます）",
+    "placeholder": "このページで起きていること…",
+    "clear": "消去",
+    "regenerate": "もう一度生成",
+    "save": "保存",
+    "close": "閉じる",
+    "view": "シーン要約を表示"
+  },
+  "batch": {
+    "title": "一括処理",
+    "description": "各ページは選んだすべての工程を終えてから次のページに進みます。1ページずつ処理するのと同じです。",
+    "pages": "ページ",
+    "steps": "工程",
+    "pause": "ページ間の待機",
+    "pauseDetail": "ページ間でモデルを休ませ、レート制限エラーを防ぎます。0 は待機なしです。",
+    "seconds": "秒",
+    "start": "一括処理を開始",
+    "busy": "すでに処理が実行中です。"
   }
 }

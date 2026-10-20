@@ -7,8 +7,7 @@
 use crate::{
     BubbleRegion, DetectionAnalysis, EntityId, EntityOrigin, Error, Geometry, Group, OcrAnalysis,
     Page, Project, RasterLayer, Region, RegionSpec, Relation, Result, SceneSummary, SourceText,
-    TextContent,
-    TextGroup, TextLayout, TextRegion, TextRole, Translation, Typography, Visibility,
+    TextContent, TextGroup, TextLayout, TextRegion, TextRole, Translation, Typography, Visibility,
     component::{Component, ComponentRecord, ValidationContext, decode, key},
     components::Assets,
     state::{Components, State},

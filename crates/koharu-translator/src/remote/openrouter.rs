@@ -10,9 +10,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::send_json;
-use crate::{
-    GenerationConfig, Model, Provider, Result, backend::encode_image, prompt::Completion,
-};
+use crate::{GenerationConfig, Model, Provider, Result, backend::encode_image, prompt::Completion};
 
 const CHAT_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
 const MODELS_URL: &str = "https://openrouter.ai/api/v1/models";

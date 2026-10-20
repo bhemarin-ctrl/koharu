@@ -18,14 +18,8 @@ import { ModelPicker } from '@/components/controls/ModelPicker'
 import { OutputPicker, type OutputDraft } from '@/components/controls/OutputPicker'
 import { call, refreshTranslationModels, savePreferences } from '@/lib/backend'
 import { pipelineStages, receivePreferences, useKoharuStore, type PipelineScope } from '@/lib/store'
-import { modelKey, providerName } from '@/lib/translation'
-import {
-  commands,
-  type Model,
-  type ModelSelection,
-  type ProviderPreference,
-  type Stage,
-} from '@koharu/bridge/protocol'
+import { availableModels, modelKey } from '@/lib/translation'
+import { commands, type ModelSelection, type Stage } from '@koharu/bridge/protocol'
 import { Button } from '@koharu/ui/components/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@koharu/ui/components/popover'
 import { cn } from '@koharu/ui/lib/utils'
@@ -315,6 +309,13 @@ function RuntimeSelector({
               onSelect={toggleStage}
             />
             <SelectorOption
+              value='summary'
+              label={t('phase.summary')}
+              detail={t('phaseDescription.summary')}
+              selected={stages.includes('summary')}
+              onSelect={toggleStage}
+            />
+            <SelectorOption
               value='translation'
               label={t('phase.translation')}
               detail={t('phaseDescription.translation')}
@@ -435,23 +436,4 @@ function SelectorOption<Value extends string>({
       {selected && <Check className='size-3.5 shrink-0 text-primary' />}
     </Button>
   )
-}
-
-function availableModels(
-  selected: ModelSelection | null,
-  models: Model[],
-  providers: ProviderPreference[],
-): Model[] {
-  if (!selected || models.some((model) => modelKey(model) === modelKey(selected))) return models
-  return [
-    {
-      provider: selected.provider,
-      model: selected.model ?? null,
-      name: selected.model ?? providerName(providers, selected.provider),
-      quantizations: [],
-      vision: selected.vision ?? false,
-      reasoning: selected.reasoning ?? false,
-    },
-    ...models,
-  ]
 }

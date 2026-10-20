@@ -16,7 +16,9 @@
     "processing": "처리 중",
     "processingFailed": "처리에 실패했습니다.",
     "stop": "중지",
-    "title": "활동"
+    "title": "활동",
+    "waiting": "페이지 사이 대기",
+    "nextPageIn": "다음 페이지까지 {{time}}"
   },
   "agent": {
     "account": "ChatGPT 계정",
@@ -240,7 +242,8 @@
     "sourceLabel": "{{name}} 원문",
     "textName": "텍스트 {{index}}",
     "title": "레이어",
-    "translationLabel": "{{name}} 번역"
+    "translationLabel": "{{name}} 번역",
+    "readingOrder": "읽는 순서 {{number}}"
   },
   "menu": {
     "about": "정보",
@@ -312,13 +315,15 @@
     "detection": "감지",
     "inpainting": "인페인팅",
     "ocr": "OCR",
-    "translation": "번역"
+    "translation": "번역",
+    "summary": "장면 요약"
   },
   "phaseDescription": {
     "detection": "페이지의 텍스트를 찾습니다.",
     "inpainting": "텍스트를 지운 뒤 그림을 복원합니다.",
     "ocr": "각 영역 안의 텍스트를 읽습니다.",
-    "translation": "원문을 대상 언어로 번역합니다."
+    "translation": "원문을 대상 언어로 번역합니다.",
+    "summary": "번역에 참고하도록 페이지에서 일어나는 일을 설명합니다."
   },
   "providerDescriptions": {
     "caiyun": "Caiyun 번역 API입니다.",
@@ -534,5 +539,38 @@
     "maximize": "최대화",
     "minimize": "최소화",
     "restore": "복원"
+  },
+  "stageRail": {
+    "title": "단계",
+    "batch": "일괄 처리",
+    "run": "이 페이지에서 {{stage}}",
+    "running": "{{stage}} 진행 중",
+    "chooseModel": "{{stage}} 모델 선택",
+    "sameAsTranslation": "번역과 같은 모델",
+    "sameAsTranslationDetail": "번역 모델로 페이지를 설명합니다",
+    "needsVision": "이미지를 볼 수 있는 모델만 페이지를 설명할 수 있습니다."
+  },
+  "summary": {
+    "title": "장면 요약",
+    "description": "번역할 때 이 페이지와 함께 전송됩니다. 이름, 화자, 어조를 바로잡으려면 편집하세요.",
+    "generated": "모델이 작성함",
+    "edited": "직접 작성함(일괄 처리에서도 유지됨)",
+    "placeholder": "이 페이지에서 일어나는 일…",
+    "clear": "지우기",
+    "regenerate": "다시 생성",
+    "save": "저장",
+    "close": "닫기",
+    "view": "장면 요약 보기"
+  },
+  "batch": {
+    "title": "일괄 처리",
+    "description": "각 페이지는 선택한 모든 단계를 마친 뒤에 다음 페이지가 시작됩니다. 페이지를 하나씩 처리하는 것과 같습니다.",
+    "pages": "페이지",
+    "steps": "단계",
+    "pause": "페이지 사이 대기",
+    "pauseDetail": "페이지 사이에 모델을 쉬게 해 사용량 제한 오류를 막습니다. 0은 대기 없음입니다.",
+    "seconds": "초",
+    "start": "일괄 처리 시작",
+    "busy": "이미 처리가 진행 중입니다."
   }
 }

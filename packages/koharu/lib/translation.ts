@@ -33,3 +33,23 @@ export function orderedLanguageChoices(
       left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }),
     )
 }
+
+/** The listed models, plus the selected one when the provider no longer lists it. */
+export function availableModels(
+  selected: ModelSelection | null,
+  models: Model[],
+  providers: ProviderPreference[],
+): Model[] {
+  if (!selected || models.some((model) => modelKey(model) === modelKey(selected))) return models
+  return [
+    {
+      provider: selected.provider,
+      model: selected.model ?? null,
+      name: selected.model ?? providerName(providers, selected.provider),
+      quantizations: [],
+      vision: selected.vision ?? false,
+      reasoning: selected.reasoning ?? false,
+    },
+    ...models,
+  ]
+}

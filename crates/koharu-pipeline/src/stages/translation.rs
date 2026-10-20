@@ -193,7 +193,12 @@ mod tests {
                     },
                 )?;
                 text(edit, pages[0], "自分の生きた証を", "Proof that I lived...");
-                text(edit, pages[0], "この世界に", "I want to leave it in this world!");
+                text(
+                    edit,
+                    pages[0],
+                    "この世界に",
+                    "I want to leave it in this world!",
+                );
                 text(edit, pages[1], "未翻訳", "");
                 text(edit, pages[2], "今", "Now");
                 Ok(())

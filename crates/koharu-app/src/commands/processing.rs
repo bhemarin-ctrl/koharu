@@ -134,7 +134,6 @@ pub(crate) async fn process(
             progress: None,
             inpainting_mask,
             page_interval: page_interval_seconds
-                .filter(|seconds| *seconds > 0)
                 .map(|seconds| Duration::from_secs(u64::from(seconds))),
         };
         request.progress = Some(Arc::new(move |event| {

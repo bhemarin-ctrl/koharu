@@ -16,7 +16,9 @@
     "processing": "Procesando",
     "processingFailed": "Error de procesamiento.",
     "stop": "Detener",
-    "title": "Actividad"
+    "title": "Actividad",
+    "waiting": "Pausa entre páginas",
+    "nextPageIn": "Siguiente página en {{time}}"
   },
   "agent": {
     "account": "Cuenta de ChatGPT",
@@ -240,7 +242,8 @@
     "sourceLabel": "Texto original de {{name}}",
     "textName": "Texto {{index}}",
     "title": "Capas",
-    "translationLabel": "Traducción de {{name}}"
+    "translationLabel": "Traducción de {{name}}",
+    "readingOrder": "Orden de lectura {{number}}"
   },
   "menu": {
     "about": "Acerca de",
@@ -312,13 +315,15 @@
     "detection": "Detección",
     "inpainting": "Relleno",
     "ocr": "OCR",
-    "translation": "Traducción"
+    "translation": "Traducción",
+    "summary": "Resumen de la escena"
   },
   "phaseDescription": {
     "detection": "Localiza el texto en la página.",
     "inpainting": "Reconstruye el dibujo tras eliminar el texto.",
     "ocr": "Lee el texto dentro de cada región.",
-    "translation": "Convierte el texto original al idioma de destino."
+    "translation": "Convierte el texto original al idioma de destino.",
+    "summary": "Describe lo que ocurre en la página para orientar la traducción."
   },
   "providerDescriptions": {
     "caiyun": "API de traducción de Caiyun.",
@@ -534,5 +539,38 @@
     "maximize": "Maximizar",
     "minimize": "Minimizar",
     "restore": "Restaurar"
+  },
+  "stageRail": {
+    "title": "Pasos",
+    "batch": "Procesamiento por lotes",
+    "run": "{{stage}} en esta página",
+    "running": "{{stage}} en curso",
+    "chooseModel": "Elegir el modelo de {{stage}}",
+    "sameAsTranslation": "Mismo modelo que la traducción",
+    "sameAsTranslationDetail": "Describe las páginas con el modelo de traducción",
+    "needsVision": "Solo los modelos que ven imágenes pueden describir páginas."
+  },
+  "summary": {
+    "title": "Resumen de la escena",
+    "description": "Se envía con esta página al traducirla. Edítalo para corregir nombres, quién habla o el tono.",
+    "generated": "Escrito por el modelo",
+    "edited": "Escrito por ti; los lotes lo conservan",
+    "placeholder": "Qué ocurre en esta página…",
+    "clear": "Borrar",
+    "regenerate": "Generar de nuevo",
+    "save": "Guardar",
+    "close": "Cerrar",
+    "view": "Ver resumen de la escena"
+  },
+  "batch": {
+    "title": "Procesamiento por lotes",
+    "description": "Cada página pasa por todos los pasos elegidos antes de que empiece la siguiente, igual que procesar las páginas una a una.",
+    "pages": "Páginas",
+    "steps": "Pasos",
+    "pause": "Pausa entre páginas",
+    "pauseDetail": "Da un respiro al modelo entre páginas y evita errores de límite. 0 significa sin pausa.",
+    "seconds": "segundos",
+    "start": "Iniciar lote",
+    "busy": "Ya hay un procesamiento en curso."
   }
 }

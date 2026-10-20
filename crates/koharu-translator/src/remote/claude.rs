@@ -9,9 +9,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use super::send_json;
-use crate::{
-    GenerationConfig, Model, Provider, Result, backend::encode_image, prompt::Completion,
-};
+use crate::{GenerationConfig, Model, Provider, Result, backend::encode_image, prompt::Completion};
 
 const URL: &str = "https://api.anthropic.com/v1/messages";
 const MODELS_URL: &str = "https://api.anthropic.com/v1/models?limit=1000";

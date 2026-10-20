@@ -11,6 +11,8 @@ mod openai;
 mod openai_compatible;
 mod openrouter;
 
+use std::time::Duration;
+
 use anyhow::Context;
 use futures::{FutureExt, future::BoxFuture, future::join_all};
 use reqwest::{Client, RequestBuilder, StatusCode};
@@ -92,7 +94,14 @@ pub(crate) async fn complete(
             minimax::complete(client, &providers.minimax, model()?, generation, completion).await
         }
         Provider::DeepSeek => {
-            deepseek::complete(client, &providers.deepseek, model()?, generation, completion).await
+            deepseek::complete(
+                client,
+                &providers.deepseek,
+                model()?,
+                generation,
+                completion,
+            )
+            .await
         }
         Provider::OpenAiCompatible => {
             openai_compatible::complete(
@@ -105,12 +114,24 @@ pub(crate) async fn complete(
             .await
         }
         Provider::OpenRouter => {
-            openrouter::complete(client, &providers.openrouter, model()?, generation, completion)
-                .await
+            openrouter::complete(
+                client,
+                &providers.openrouter,
+                model()?,
+                generation,
+                completion,
+            )
+            .await
         }
         Provider::LmStudio => {
-            lm_studio::complete(client, &providers.lm_studio, model()?, generation, completion)
-                .await
+            lm_studio::complete(
+                client,
+                &providers.lm_studio,
+                model()?,
+                generation,
+                completion,
+            )
+            .await
         }
         Provider::DeepL | Provider::GoogleCloudTranslation | Provider::Caiyun => {
             Err(Error::PromptUnsupported {
@@ -157,38 +178,91 @@ fn append_models(models: &mut Vec<Model>, result: Result<Vec<Model>>) {
     }
 }
 
+/// Waits before each retry of a transient failure. Hosted models answer
+/// overload and per-minute rate limits with 429, 500, 502, 503 and 504, which
+/// usually clear within a minute; without retrying, one such answer would stop
+/// a long batch partway through a volume.
+const RETRY_DELAYS: [Duration; 3] = [
+    Duration::from_secs(10),
+    Duration::from_secs(30),
+    Duration::from_secs(60),
+];
+
 pub(super) async fn send_json<T: DeserializeOwned>(
     provider: &'static str,
     request: RequestBuilder,
 ) -> Result<T> {
-    let response = request
-        .send()
-        .await
-        .with_context(|| format!("{provider} request failed"))?;
+    let mut request = request;
+    let mut delays = RETRY_DELAYS.iter();
+    loop {
+        let retry = request.try_clone();
+        let (result, transient) = send_once(provider, request).await;
+        match (result, transient, retry, delays.next()) {
+            (Err(error), true, Some(next), Some(delay)) => {
+                tracing::warn!(provider, %error, ?delay, "retrying after a transient model API failure");
+                tokio::time::sleep(*delay).await;
+                request = next;
+            }
+            (result, ..) => return result,
+        }
+    }
+}
+
+/// Sends one request. The flag reports whether a failure is worth retrying:
+/// a lost connection, a timeout, an overloaded server, or a rate limit, but
+/// not an exhausted balance, a bad key, or a malformed request.
+async fn send_once<T: DeserializeOwned>(
+    provider: &'static str,
+    request: RequestBuilder,
+) -> (Result<T>, bool) {
+    let response = match request.send().await {
+        Ok(response) => response,
+        Err(error) => {
+            let transient = error.is_timeout() || error.is_connect() || error.is_request();
+            let error = anyhow::Error::new(error).context(format!("{provider} request failed"));
+            return (Err(error.into()), transient);
+        }
+    };
     let status = response.status();
-    let text = response
-        .text()
-        .await
-        .with_context(|| format!("failed to read {provider} response"))?;
+    let text = match response.text().await {
+        Ok(text) => text,
+        Err(error) => {
+            let error =
+                anyhow::Error::new(error).context(format!("failed to read {provider} response"));
+            return (Err(error.into()), true);
+        }
+    };
 
     if !status.is_success() {
         let lower = text.to_ascii_lowercase();
+        let exhausted =
+            lower.contains("insufficient_quota") || lower.contains("credit balance is too low");
         if status == StatusCode::TOO_MANY_REQUESTS
-            || lower.contains("insufficient_quota")
+            || exhausted
             || lower.contains("resource_exhausted")
             || lower.contains("rate limit exceeded")
-            || lower.contains("credit balance is too low")
         {
-            return Err(Error::QuotaExceeded { provider });
+            return (Err(Error::QuotaExceeded { provider }), !exhausted);
         }
-        return Err(Error::Api {
-            provider,
-            status: status.as_u16(),
-            message: text.chars().take(4096).collect(),
-        });
+        let transient = matches!(
+            status,
+            StatusCode::INTERNAL_SERVER_ERROR
+                | StatusCode::BAD_GATEWAY
+                | StatusCode::SERVICE_UNAVAILABLE
+                | StatusCode::GATEWAY_TIMEOUT
+        );
+        return (
+            Err(Error::Api {
+                provider,
+                status: status.as_u16(),
+                message: text.chars().take(4096).collect(),
+            }),
+            transient,
+        );
     }
 
-    serde_json::from_str(&text)
+    let decoded = serde_json::from_str(&text)
         .with_context(|| format!("failed to decode {provider} response"))
-        .map_err(Into::into)
+        .map_err(Into::into);
+    (decoded, false)
 }

@@ -79,9 +79,10 @@ pub struct Request {
     pub stop: StopToken,
     pub progress: Option<ProgressSink>,
     pub inpainting_mask: Option<InpaintingMask>,
-    /// When set, pages run one at a time and the next page waits this long
-    /// after the previous page finishes, which keeps hosted models under
-    /// their rate limits during long batches.
+    /// When set, pages run one at a time, each through every requested stage
+    /// before the next one starts, and the next page waits this long after the
+    /// previous page finishes. A zero interval runs pages one by one without
+    /// pausing; the pause keeps hosted models under their rate limits.
     pub page_interval: Option<Duration>,
 }
 

@@ -96,7 +96,10 @@ pub(crate) fn summary_text(provider: &str, text: &str) -> anyhow::Result<String>
         )
     })?;
     let summary = output.summary.trim();
-    anyhow::ensure!(!summary.is_empty(), "{provider} returned an empty scene summary");
+    anyhow::ensure!(
+        !summary.is_empty(),
+        "{provider} returned an empty scene summary"
+    );
     Ok(summary.to_owned())
 }
 
@@ -507,12 +510,17 @@ mod tests {
         assert_eq!(input["previous_scenes"][0], "The boy enters a forest.");
         assert_eq!(input["context"][0]["translation"], "earlier line");
         assert!(completion.system.contains("Scene requirements"));
-        assert!(completion.system.contains("Do not translate or return the scene"));
+        assert!(
+            completion
+                .system
+                .contains("Do not translate or return the scene")
+        );
     }
 
     #[test]
     fn a_page_without_memory_sends_no_scene_fields() {
-        let completion = translation(&TranslationRequest::new(["text"], Language::English)).unwrap();
+        let completion =
+            translation(&TranslationRequest::new(["text"], Language::English)).unwrap();
         let input: serde_json::Value = serde_json::from_str(&completion.user).unwrap();
         assert!(input.get("scene").is_none());
         assert!(input.get("previous_scenes").is_none());

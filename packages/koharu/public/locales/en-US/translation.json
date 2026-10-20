@@ -16,7 +16,9 @@
     "processing": "Processing",
     "processingFailed": "Processing failed.",
     "stop": "Stop",
-    "title": "Activity"
+    "title": "Activity",
+    "waiting": "Pause between pages",
+    "nextPageIn": "Next page in {{time}}"
   },
   "agent": {
     "account": "ChatGPT account",
@@ -240,7 +242,8 @@
     "sourceLabel": "{{name}} source text",
     "textName": "Text {{index}}",
     "title": "Layers",
-    "translationLabel": "{{name}} translation"
+    "translationLabel": "{{name}} translation",
+    "readingOrder": "Reading order {{number}}"
   },
   "menu": {
     "about": "About",
@@ -312,13 +315,15 @@
     "detection": "Detection",
     "inpainting": "Inpainting",
     "ocr": "OCR",
-    "translation": "Translation"
+    "translation": "Translation",
+    "summary": "Scene summary"
   },
   "phaseDescription": {
     "detection": "Locate text on the page.",
     "inpainting": "Rebuild the artwork behind removed text.",
     "ocr": "Read the text inside each region.",
-    "translation": "Convert source text to the target language."
+    "translation": "Convert source text to the target language.",
+    "summary": "Describes what happens on the page to guide the translation."
   },
   "providerDescriptions": {
     "caiyun": "Caiyun translation API.",
@@ -534,5 +539,38 @@
     "maximize": "Maximize",
     "minimize": "Minimize",
     "restore": "Restore"
+  },
+  "stageRail": {
+    "title": "Pipeline steps",
+    "batch": "Batch processing",
+    "run": "{{stage}} on this page",
+    "running": "{{stage}} is running",
+    "chooseModel": "Choose the model for {{stage}}",
+    "sameAsTranslation": "Same model as translation",
+    "sameAsTranslationDetail": "Describes pages with the translation model",
+    "needsVision": "Only models that can see images can describe pages."
+  },
+  "summary": {
+    "title": "Scene summary",
+    "description": "Sent with this page when it is translated. Edit it to fix names, who is speaking, or the tone.",
+    "generated": "Written by the model",
+    "edited": "Written by you; batches keep it",
+    "placeholder": "What happens on this page…",
+    "clear": "Clear",
+    "regenerate": "Generate again",
+    "save": "Save",
+    "close": "Close",
+    "view": "View scene summary"
+  },
+  "batch": {
+    "title": "Batch processing",
+    "description": "Each page goes through every chosen step before the next page starts, the same as processing the pages one by one.",
+    "pages": "Pages",
+    "steps": "Steps",
+    "pause": "Pause between pages",
+    "pauseDetail": "Gives the model a break between pages and avoids rate-limit errors. 0 means no pause.",
+    "seconds": "seconds",
+    "start": "Start batch",
+    "busy": "Processing is already running."
   }
 }

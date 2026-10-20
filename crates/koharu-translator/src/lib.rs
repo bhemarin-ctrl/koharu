@@ -161,7 +161,14 @@ impl Translator {
                 .await?
         } else {
             let providers = self.providers.read()?.clone();
-            remote::complete(&self.client, &providers, selection, &generation, &completion).await?
+            remote::complete(
+                &self.client,
+                &providers,
+                selection,
+                &generation,
+                &completion,
+            )
+            .await?
         };
         Ok((provider_id, prompt::summary_text(provider_id, &text)?))
     }

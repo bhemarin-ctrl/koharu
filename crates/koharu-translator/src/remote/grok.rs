@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use super::send_json;
 use crate::{
-    GenerationConfig, Model, Provider, Result, backend::encode_image,
-    display_name, prompt::Completion,
+    GenerationConfig, Model, Provider, Result, backend::encode_image, display_name,
+    prompt::Completion,
 };
 
 const RESPONSES_URL: &str = "https://api.x.ai/v1/responses";

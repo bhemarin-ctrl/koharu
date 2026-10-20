@@ -89,7 +89,9 @@ beforeEach(() => {
     brush: { diameter: 48, color: '#FFFFFF' },
     inspector: 'copy',
     processingScope: 'selected-pages',
-    processingStages: ['detection', 'ocr', 'translation', 'inpainting'],
+    processingStages: ['detection', 'ocr', 'summary', 'translation', 'inpainting'],
+    pageIntervalSeconds: 60,
+    batchOpen: false,
     settingsOpen: false,
     shortcuts: defaultShortcuts,
   })

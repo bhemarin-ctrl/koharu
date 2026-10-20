@@ -34,6 +34,7 @@ import {
   isLockedLayer,
   isTextLayer,
   layerChildren,
+  readingOrder,
 } from '@/lib/document'
 import { pageKey, projectKey, queryClient, refresh, useFonts, usePage } from '@/lib/queries'
 import { useKoharuStore } from '@/lib/store'
@@ -506,6 +507,7 @@ function LayersInspector() {
   }, [selected])
 
   const layers = useMemo(() => (page ? displayedLayers(page.layers, page.id) : []), [page])
+  const order = useMemo(() => readingOrder(page?.layers ?? []), [page])
 
   if (!page) return <EmptyInspector>{t('inspector.selectPage')}</EmptyInspector>
 
@@ -613,6 +615,7 @@ function LayersInspector() {
                 key={`${layer.type}:${layer.id}`}
                 layer={layer}
                 index={index}
+                order={order.get(layer.id)}
                 depth={depth}
                 selected={selected.includes(layer.id)}
                 expanded={!locked && expandedLayer === layer.id}
@@ -643,6 +646,7 @@ function LayersInspector() {
 function LayerRow({
   layer,
   index,
+  order,
   depth,
   selected,
   expanded,
@@ -657,6 +661,7 @@ function LayerRow({
 }: {
   layer: Layer
   index: number
+  order?: number
   depth: number
   selected: boolean
   expanded: boolean
@@ -689,7 +694,16 @@ function LayerRow({
             className='flex min-w-0 flex-1 items-center gap-1.5 rounded-lg px-1.5 py-1 text-left hover:bg-foreground/[0.05] focus-visible:ring-2 focus-visible:ring-ring/25'
             onClick={onSelect}
           >
-            <Icon className='size-3.5 shrink-0 text-muted-foreground' />
+            {order === undefined ? (
+              <Icon className='size-3.5 shrink-0 text-muted-foreground' />
+            ) : (
+              <span
+                aria-label={t('layers.readingOrder', { number: order })}
+                className='grid h-4 min-w-4 shrink-0 place-items-center rounded-[5px] bg-primary px-1 text-[9px] leading-none font-semibold text-primary-foreground tabular-nums'
+              >
+                {order}
+              </span>
+            )}
             <span className='min-w-0 flex-1'>
               <span className='block truncate text-[11px] font-medium'>{name}</span>
               <span className='block truncate text-[9px] leading-3 text-muted-foreground capitalize'>

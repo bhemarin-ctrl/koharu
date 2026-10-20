@@ -16,7 +16,9 @@
     "processing": "İşleniyor",
     "processingFailed": "İşleme başarısız oldu.",
     "stop": "Durdur",
-    "title": "Etkinlik"
+    "title": "Etkinlik",
+    "waiting": "Sayfalar arası bekleme",
+    "nextPageIn": "Sonraki sayfa {{time}} sonra"
   },
   "agent": {
     "account": "ChatGPT hesabı",
@@ -240,7 +242,8 @@
     "sourceLabel": "{{name}} kaynak metni",
     "textName": "Metin {{index}}",
     "title": "Katmanlar",
-    "translationLabel": "{{name}} çevirisi"
+    "translationLabel": "{{name}} çevirisi",
+    "readingOrder": "Okuma sırası {{number}}"
   },
   "menu": {
     "about": "Hakkında",
@@ -312,13 +315,15 @@
     "detection": "Algılama",
     "inpainting": "Doldurma",
     "ocr": "OCR",
-    "translation": "Çeviri"
+    "translation": "Çeviri",
+    "summary": "Sahne özeti"
   },
   "phaseDescription": {
     "detection": "Sayfadaki metni bulur.",
     "inpainting": "Metin kaldırıldıktan sonra çizimi yeniden oluşturur.",
     "ocr": "Her bölgenin içindeki metni okur.",
-    "translation": "Kaynak metni hedef dile çevirir."
+    "translation": "Kaynak metni hedef dile çevirir.",
+    "summary": "Çeviriye yön vermek için sayfada olanları anlatır."
   },
   "providerDescriptions": {
     "caiyun": "Caiyun çeviri API'si.",
@@ -534,5 +539,38 @@
     "maximize": "Ekranı kapla",
     "minimize": "Simge durumuna küçült",
     "restore": "Geri yükle"
+  },
+  "stageRail": {
+    "title": "Adımlar",
+    "batch": "Toplu işlem",
+    "run": "Bu sayfada {{stage}}",
+    "running": "{{stage}} sürüyor",
+    "chooseModel": "{{stage}} için model seç",
+    "sameAsTranslation": "Çeviriyle aynı model",
+    "sameAsTranslationDetail": "Sayfaları çeviri modeliyle anlatır",
+    "needsVision": "Yalnızca görüntü görebilen modeller sayfaları anlatabilir."
+  },
+  "summary": {
+    "title": "Sahne özeti",
+    "description": "Çevrilirken bu sayfayla birlikte gönderilir. İsimleri, konuşanı veya tonu düzeltmek için düzenleyin.",
+    "generated": "Model tarafından yazıldı",
+    "edited": "Sizin tarafınızdan yazıldı; toplu işlemler korur",
+    "placeholder": "Bu sayfada neler oluyor…",
+    "clear": "Temizle",
+    "regenerate": "Yeniden oluştur",
+    "save": "Kaydet",
+    "close": "Kapat",
+    "view": "Sahne özetini görüntüle"
+  },
+  "batch": {
+    "title": "Toplu işlem",
+    "description": "Her sayfa, bir sonraki başlamadan önce seçilen tüm adımlardan geçer; sayfaları tek tek işlemekle aynıdır.",
+    "pages": "Sayfalar",
+    "steps": "Adımlar",
+    "pause": "Sayfalar arası bekleme",
+    "pauseDetail": "Sayfalar arasında modele nefes aldırır ve sınır hatalarını önler. 0 bekleme yok demektir.",
+    "seconds": "saniye",
+    "start": "Toplu işlemi başlat",
+    "busy": "Zaten bir işlem sürüyor."
   }
 }

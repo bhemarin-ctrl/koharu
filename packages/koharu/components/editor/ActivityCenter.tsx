@@ -1,7 +1,8 @@
 'use client'
 
 import { useMutationState } from '@tanstack/react-query'
-import { CircleAlert, Download, LoaderCircle, Square, X } from 'lucide-react'
+import { CircleAlert, Download, Hourglass, LoaderCircle, Square, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { call } from '@/lib/backend'
@@ -123,16 +124,24 @@ function JobItem({ job }: { job: Job }) {
     )
   }
   const percent = progress(job.completed, job.total)
+  const waiting = job.stage === null && job.resumes_at !== null
   return (
     <div className='border-b p-3 last:border-b-0'>
       <div className='grid grid-cols-[1rem_minmax(0,1fr)_2.25rem_1.5rem] items-start gap-x-2.5'>
-        <span className='mt-1.5 size-1.5 justify-self-center rounded-full bg-primary' />
+        {waiting ? (
+          <Hourglass className='mt-0.5 size-3.5 justify-self-center text-primary' />
+        ) : (
+          <span className='mt-1.5 size-1.5 justify-self-center rounded-full bg-primary' />
+        )}
         <div className='min-w-0'>
-          <span className='block truncate text-[12px] font-medium capitalize'>
-            {job.stage
-              ? t(`phase.${job.stage}`, { defaultValue: job.stage })
-              : t('activity.processing')}
+          <span className='block truncate text-[12px] font-medium first-letter:uppercase'>
+            {waiting
+              ? t('activity.waiting')
+              : job.stage
+                ? t(`phase.${job.stage}`, { defaultValue: job.stage })
+                : t('activity.processing')}
           </span>
+          {waiting && job.resumes_at !== null && <Countdown until={job.resumes_at} />}
         </div>
         <span className='pt-0.5 text-right text-[10px] tabular-nums'>
           {percent !== null ? `${percent}%` : null}
@@ -161,6 +170,22 @@ function JobItem({ job }: { job: Job }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function Countdown({ until }: { until: number }) {
+  const { t } = useTranslation()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const seconds = Math.max(0, Math.ceil((until - now) / 1000))
+  const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  return (
+    <span className='block text-[10px] text-muted-foreground tabular-nums'>
+      {t('activity.nextPageIn', { time })}
+    </span>
   )
 }
 

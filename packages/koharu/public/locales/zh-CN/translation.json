@@ -16,7 +16,9 @@
     "processing": "正在处理",
     "processingFailed": "处理失败。",
     "stop": "停止",
-    "title": "活动"
+    "title": "活动",
+    "waiting": "页面间暂停",
+    "nextPageIn": "{{time}} 后处理下一页"
   },
   "agent": {
     "account": "ChatGPT 账户",
@@ -240,7 +242,8 @@
     "sourceLabel": "{{name}} 的原文",
     "textName": "文本 {{index}}",
     "title": "图层",
-    "translationLabel": "{{name}} 的译文"
+    "translationLabel": "{{name}} 的译文",
+    "readingOrder": "阅读顺序 {{number}}"
   },
   "menu": {
     "about": "关于",
@@ -312,13 +315,15 @@
     "detection": "检测",
     "inpainting": "修补",
     "ocr": "OCR",
-    "translation": "翻译"
+    "translation": "翻译",
+    "summary": "场景摘要"
   },
   "phaseDescription": {
     "detection": "定位页面上的文本。",
     "inpainting": "重建移除文字后的画面。",
     "ocr": "读取每个区域中的文本。",
-    "translation": "将原文翻译为目标语言。"
+    "translation": "将原文翻译为目标语言。",
+    "summary": "描述页面上发生的事情，用于指导翻译。"
   },
   "providerDescriptions": {
     "caiyun": "Caiyun 翻译 API。",
@@ -534,5 +539,38 @@
     "maximize": "最大化",
     "minimize": "最小化",
     "restore": "还原"
+  },
+  "stageRail": {
+    "title": "步骤",
+    "batch": "批量处理",
+    "run": "在此页执行{{stage}}",
+    "running": "{{stage}}进行中",
+    "chooseModel": "选择{{stage}}的模型",
+    "sameAsTranslation": "与翻译相同的模型",
+    "sameAsTranslationDetail": "使用翻译模型描述页面",
+    "needsVision": "只有能识别图像的模型才能描述页面。"
+  },
+  "summary": {
+    "title": "场景摘要",
+    "description": "翻译时会随此页一起发送。可编辑以修正人名、说话人或语气。",
+    "generated": "由模型撰写",
+    "edited": "由你撰写；批量处理会保留",
+    "placeholder": "此页发生了什么…",
+    "clear": "清除",
+    "regenerate": "重新生成",
+    "save": "保存",
+    "close": "关闭",
+    "view": "查看场景摘要"
+  },
+  "batch": {
+    "title": "批量处理",
+    "description": "每一页都会完成所有选定步骤后才开始下一页，与逐页手动处理相同。",
+    "pages": "页面",
+    "steps": "步骤",
+    "pause": "页面间暂停",
+    "pauseDetail": "让模型在页面之间稍作休息，避免触发速率限制。0 表示不暂停。",
+    "seconds": "秒",
+    "start": "开始批量处理",
+    "busy": "已有处理正在进行。"
   }
 }

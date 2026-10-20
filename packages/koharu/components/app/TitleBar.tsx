@@ -58,8 +58,12 @@ export function TitleBar() {
     'menu.export',
   )
 
-  const run = (scope: Scope, operation: Operation = { operation: 'full' }) =>
-    void call(commands.process, scope, operation).catch(() => undefined)
+  // Several pages always run one at a time, with the batch pause between them.
+  const run = (scope: Scope, operation: Operation = { operation: 'full' }) => {
+    const paged = scope.scope === 'project' || (scope.scope === 'pages' && scope.value.length > 1)
+    const interval = paged ? useKoharuStore.getState().pageIntervalSeconds : null
+    void call(commands.process, scope, operation, interval).catch(() => undefined)
+  }
 
   const closeProject = () => void call(commands.closeProject).catch(() => undefined)
 
@@ -218,17 +222,19 @@ export function TitleBar() {
                 {t('menu.processLayers')}
               </MenubarItem>
               <MenubarSeparator />
-              {(['detection', 'ocr', 'translation', 'inpainting'] as Stage[]).map((stage) => (
-                <MenubarItem
-                  key={stage}
-                  disabled={!project || pages.length === 0}
-                  onClick={() => run({ scope: 'project' }, { operation: 'through', stage })}
-                >
-                  {t('menu.runPhase', {
-                    phase: t(`phase.${stage}`),
-                  })}
-                </MenubarItem>
-              ))}
+              {(['detection', 'ocr', 'summary', 'translation', 'inpainting'] as Stage[]).map(
+                (stage) => (
+                  <MenubarItem
+                    key={stage}
+                    disabled={!project || pages.length === 0}
+                    onClick={() => run({ scope: 'project' }, { operation: 'through', stage })}
+                  >
+                    {t('menu.runPhase', {
+                      phase: t(`phase.${stage}`),
+                    })}
+                  </MenubarItem>
+                ),
+              )}
             </MenubarContent>
           </MenubarMenu>
 

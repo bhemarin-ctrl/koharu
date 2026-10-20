@@ -33,6 +33,7 @@ export const commands = {
 	size: PageSize,
 	layers: Layer[],
 	regions: AnalysisRegion[],
+	scene_summary: SceneSummary | null,
 } | null>("get_page").then((v) => (v==null?v:({...v,layers:v.layers.map(i=>i),regions:v.regions.map(i=>({...i,geometry:({...i.geometry,points:i.geometry.points.map(i=>i)})}))}) as typeof v)),
 	listProjects: () => __TAURI_INVOKE<ProjectSummary[]>("list_projects"),
 	createProject: (name: string) => __TAURI_INVOKE<null>("create_project", { name }),
@@ -475,7 +476,7 @@ export type SceneSummary = {
 	generated: boolean,
 };
 
-export type Scope ={ scope: "project" } | { scope: "pages"; value: EntityId[] } | { scope: "region"; value: {
+export type Scope = { scope: "project" } | { scope: "pages"; value: EntityId[] } | { scope: "region"; value: {
 	page: EntityId,
 	bounds: Bounds,
 } } | { scope: "entities"; value: EntityId[] };

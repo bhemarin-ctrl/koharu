@@ -3,7 +3,12 @@
 import { useMemo, useRef } from 'react'
 
 import { SelectionControls } from '@/components/editor/SelectionControls'
-import { effectiveLayerVisibility, expandLayerSelection, isTextLayer } from '@/lib/document'
+import {
+  effectiveLayerVisibility,
+  expandLayerSelection,
+  isTextLayer,
+  readingOrder,
+} from '@/lib/document'
 import { controlFrame, cssFrame, selectableLayer, type Camera } from '@/lib/geometry'
 import { useKoharuStore } from '@/lib/store'
 import type {
@@ -52,6 +57,7 @@ export function CanvasOverlay({
     [page.layers, selected],
   )
   const selectedIds = useMemo(() => new Set(expandedSelection), [expandedSelection])
+  const order = useMemo(() => readingOrder(page.layers), [page.layers])
   const multipleSelected = expandedSelection.length > 1
   const layers = useMemo(
     () =>
@@ -110,6 +116,22 @@ export function CanvasOverlay({
               willChange: selected ? 'left, top, width, height, transform' : undefined,
             }}
           />
+        )
+      })}
+
+      {layers.map(({ layer, frame }) => {
+        const number = order.get(layer.id)
+        if (number === undefined) return null
+        const position = cssFrame(frame, camera)
+        return (
+          <span
+            key={`order:${layer.id}`}
+            data-reading-order={number}
+            className='absolute grid h-4 min-w-4 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[5px] bg-foreground/85 px-1 text-[9px] leading-none font-semibold text-background tabular-nums shadow-sm'
+            style={{ left: position.left, top: position.top }}
+          >
+            {number}
+          </span>
         )
       })}
 

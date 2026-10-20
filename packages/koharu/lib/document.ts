@@ -44,3 +44,18 @@ export function effectiveLayerVisibility(layers: Layer[], layer: Layer) {
   }
   return { visible, opacity }
 }
+
+/**
+ * Reading position of each text layer, starting at 1. The order of a text
+ * group is the order its text is read and sent to translation.
+ */
+export function readingOrder(layers: Layer[]): Map<string, number> {
+  const order = new Map<string, number>()
+  for (const group of layers) {
+    if (!isGroupLayer(group) || group.role !== 'text') continue
+    layerChildren(layers, group.id)
+      .filter(isTextLayer)
+      .forEach((layer, index) => order.set(layer.id, index + 1))
+  }
+  return order
+}

@@ -16,7 +16,9 @@
     "processing": "Processando",
     "processingFailed": "Falha no processamento.",
     "stop": "Parar",
-    "title": "Atividade"
+    "title": "Atividade",
+    "waiting": "Pausa entre páginas",
+    "nextPageIn": "Próxima página em {{time}}"
   },
   "agent": {
     "account": "Conta do ChatGPT",
@@ -240,7 +242,8 @@
     "sourceLabel": "Texto de origem de {{name}}",
     "textName": "Texto {{index}}",
     "title": "Camadas",
-    "translationLabel": "Tradução de {{name}}"
+    "translationLabel": "Tradução de {{name}}",
+    "readingOrder": "Ordem de leitura {{number}}"
   },
   "menu": {
     "about": "Sobre",
@@ -312,13 +315,15 @@
     "detection": "Detecção",
     "inpainting": "Preenchimento",
     "ocr": "OCR",
-    "translation": "Tradução"
+    "translation": "Tradução",
+    "summary": "Resumo da cena"
   },
   "phaseDescription": {
     "detection": "Localiza o texto na página.",
     "inpainting": "Reconstrói a arte após remover o texto.",
     "ocr": "Lê o texto dentro de cada região.",
-    "translation": "Converte o texto original para o idioma de destino."
+    "translation": "Converte o texto original para o idioma de destino.",
+    "summary": "Descreve o que acontece na página para orientar a tradução."
   },
   "providerDescriptions": {
     "caiyun": "API de tradução do Caiyun.",
@@ -534,5 +539,38 @@
     "maximize": "Maximizar",
     "minimize": "Minimizar",
     "restore": "Restaurar"
+  },
+  "stageRail": {
+    "title": "Etapas",
+    "batch": "Processamento em lote",
+    "run": "{{stage}} nesta página",
+    "running": "{{stage}} em andamento",
+    "chooseModel": "Escolher o modelo de {{stage}}",
+    "sameAsTranslation": "Mesmo modelo da tradução",
+    "sameAsTranslationDetail": "Descreve as páginas com o modelo da tradução",
+    "needsVision": "Só modelos que enxergam imagens conseguem descrever as páginas."
+  },
+  "summary": {
+    "title": "Resumo da cena",
+    "description": "É enviado junto com esta página na tradução. Edite para corrigir nomes, quem está falando ou o tom.",
+    "generated": "Escrito pelo modelo",
+    "edited": "Escrito por você; o lote mantém este texto",
+    "placeholder": "O que acontece nesta página…",
+    "clear": "Limpar",
+    "regenerate": "Gerar de novo",
+    "save": "Salvar",
+    "close": "Fechar",
+    "view": "Ver resumo da cena"
+  },
+  "batch": {
+    "title": "Processamento em lote",
+    "description": "Cada página passa por todas as etapas escolhidas antes de a próxima começar, igual a processar as páginas uma por uma.",
+    "pages": "Páginas",
+    "steps": "Etapas",
+    "pause": "Pausa entre páginas",
+    "pauseDetail": "Dá um respiro ao modelo entre as páginas e evita erros de limite. 0 = sem pausa.",
+    "seconds": "segundos",
+    "start": "Iniciar lote",
+    "busy": "Já há um processamento em andamento."
   }
 }

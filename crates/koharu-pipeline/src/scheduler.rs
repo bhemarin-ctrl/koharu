@@ -68,6 +68,9 @@ impl Scheduler {
         stages: &[Stage],
         page_interval: Option<Duration>,
     ) -> Self {
+        // Any interval, zero included, asks for one page at a time; only a
+        // non-zero interval adds a pause between pages.
+        let sequential = page_interval.is_some();
         let page_interval = page_interval.filter(|interval| !interval.is_zero());
         let pages = pages
             .iter()
@@ -90,13 +93,10 @@ impl Scheduler {
                 .map(|(index, page)| (page.page, index))
                 .collect(),
             pages,
-            // A paced batch finishes one page completely before the next one
-            // starts; otherwise every stage may work on its own page.
-            page_window: if page_interval.is_some() {
-                1
-            } else {
-                stages.len().max(1)
-            },
+            // A sequential batch finishes one page completely before the next
+            // one starts, exactly like processing the pages one by one;
+            // otherwise every stage may work on its own page.
+            page_window: if sequential { 1 } else { stages.len().max(1) },
             active_pages: 0,
             head: 0,
             total,
@@ -260,7 +260,10 @@ mod tests {
         let mut scheduler = Scheduler::new(&pages, &stages, None);
         let mut busy = BTreeSet::new();
 
-        assert_eq!(scheduler.start_next(&busy), Some((pages[0], Stage::Summary)));
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[0], Stage::Summary))
+        );
         assert!(!scheduler.complete_stage(pages[0], Stage::Summary));
         assert_eq!(
             scheduler.start_next(&busy),
@@ -269,7 +272,10 @@ mod tests {
         busy.insert(Stage::Translation);
         // Page 1 may describe its scene while page 0 translates, but it
         // cannot translate before page 0's translation is committed.
-        assert_eq!(scheduler.start_next(&busy), Some((pages[1], Stage::Summary)));
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[1], Stage::Summary))
+        );
         busy.clear();
         assert!(!scheduler.complete_stage(pages[1], Stage::Summary));
         assert!(scheduler.start_next(&busy).is_none());
@@ -285,11 +291,13 @@ mod tests {
     fn a_paced_batch_runs_one_page_then_waits() {
         let pages = pages(2);
         let stages = [Stage::Detection, Stage::Ocr];
-        let mut scheduler =
-            Scheduler::new(&pages, &stages, Some(Duration::from_secs(60)));
+        let mut scheduler = Scheduler::new(&pages, &stages, Some(Duration::from_secs(60)));
         let busy = BTreeSet::new();
 
-        assert_eq!(scheduler.start_next(&busy), Some((pages[0], Stage::Detection)));
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[0], Stage::Detection))
+        );
         assert!(!scheduler.complete_stage(pages[0], Stage::Detection));
         // The second page does not start alongside the first.
         assert_eq!(scheduler.start_next(&busy), Some((pages[0], Stage::Ocr)));
@@ -303,7 +311,39 @@ mod tests {
         assert!(resume_at > Instant::now() + Duration::from_secs(55));
 
         scheduler.resume_at = Some(Instant::now());
-        assert_eq!(scheduler.start_next(&busy), Some((pages[1], Stage::Detection)));
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[1], Stage::Detection))
+        );
+    }
+
+    #[test]
+    fn a_zero_interval_still_runs_one_page_at_a_time_without_pausing() {
+        let pages = pages(2);
+        let stages = [Stage::Detection, Stage::Ocr, Stage::Inpainting];
+        let mut scheduler = Scheduler::new(&pages, &stages, Some(Duration::ZERO));
+        let mut busy = BTreeSet::new();
+
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[0], Stage::Detection))
+        );
+        assert!(!scheduler.complete_stage(pages[0], Stage::Detection));
+        let ocr = scheduler.start_next(&busy).unwrap();
+        busy.insert(ocr.1);
+        let inpainting = scheduler.start_next(&busy).unwrap();
+        busy.insert(inpainting.1);
+        // Detection is idle, but the next page waits for this one to finish.
+        assert!(scheduler.start_next(&busy).is_none());
+
+        busy.clear();
+        assert!(!scheduler.complete_stage(pages[0], Stage::Ocr));
+        assert!(scheduler.complete_stage(pages[0], Stage::Inpainting));
+        assert!(scheduler.waiting().is_none());
+        assert_eq!(
+            scheduler.start_next(&busy),
+            Some((pages[1], Stage::Detection))
+        );
     }
 
     #[test]
