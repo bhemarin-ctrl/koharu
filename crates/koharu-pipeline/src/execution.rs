@@ -133,7 +133,11 @@ impl<'a> Execution<'a> {
     }
 
     /// Sleeps between pages of a paced batch. Stopping ends the pause early.
-    async fn pause_until(&self, next: EntityId, resume_at: Instant) {
+    ///
+    /// Takes `&mut self` because the execution holds a `&mut dyn Committer`,
+    /// which is not `Sync`: a shared borrow held across the sleep would make
+    /// the whole run future non-`Send`, and the app runs it on a spawned task.
+    async fn pause_until(&mut self, next: EntityId, resume_at: Instant) {
         progress::emit(
             self.progress.as_ref(),
             Progress::Waiting {

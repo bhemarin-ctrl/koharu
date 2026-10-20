@@ -1,5 +1,20 @@
 use super::*;
 
+/// The app runs pipelines on spawned tasks, so the run future must stay
+/// `Send`. This does not run; it fails to compile when that breaks.
+#[allow(dead_code)]
+fn execution_future_is_send(pipeline: &Pipeline, committer: &mut dyn Committer) {
+    fn send<T: Send>(_: &T) {}
+    let snapshot = unreachable_snapshot();
+    let future = pipeline.execute(snapshot, Request::default(), committer);
+    send(&future);
+}
+
+#[allow(dead_code)]
+fn unreachable_snapshot() -> koharu_scene::Snapshot {
+    unreachable!("only used to type-check execution_future_is_send")
+}
+
 #[test]
 fn configuration_ignores_unknown_fields() {
     let config = toml::from_str::<PipelineConfig>("legacy_limit = 1").unwrap();

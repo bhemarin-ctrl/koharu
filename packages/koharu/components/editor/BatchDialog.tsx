@@ -1,6 +1,7 @@
 'use client'
 
 import { Minus, Play, Plus } from 'lucide-react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { runPipeline } from '@/lib/processing'
@@ -49,6 +50,14 @@ export function BatchDialog() {
   const running = Object.values(jobs).some((job) => job.state === 'running')
   const unavailable =
     !page || stages.length === 0 || (scope === 'selected-pages' && selectedPages.length === 0)
+
+  // A batch is for many pages: with one page or none selected, start from the
+  // whole project, as Neko does, rather than quietly running a single page.
+  useEffect(() => {
+    if (open && scope !== 'project' && selectedPages.length < 2) setScope('project')
+    // Only when the dialog opens; later choices stay as the user makes them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const toggle = (stage: Stage, checked: boolean) =>
     setStages(

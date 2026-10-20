@@ -219,7 +219,10 @@ async fn send_once<T: DeserializeOwned>(
         Ok(response) => response,
         Err(error) => {
             let transient = error.is_timeout() || error.is_connect() || error.is_request();
-            let error = anyhow::Error::new(error).context(format!("{provider} request failed"));
+            // Some providers take the API key as a query parameter, so the
+            // URL stays out of an error that is logged and shown to the user.
+            let error = anyhow::Error::new(error.without_url())
+                .context(format!("{provider} request failed"));
             return (Err(error.into()), transient);
         }
     };
@@ -227,8 +230,8 @@ async fn send_once<T: DeserializeOwned>(
     let text = match response.text().await {
         Ok(text) => text,
         Err(error) => {
-            let error =
-                anyhow::Error::new(error).context(format!("failed to read {provider} response"));
+            let error = anyhow::Error::new(error.without_url())
+                .context(format!("failed to read {provider} response"));
             return (Err(error.into()), true);
         }
     };
