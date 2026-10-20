@@ -7,6 +7,10 @@ name: Instalador Mac
 
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner label (Apple Silicon runners are often out of capacity)
+        default: macos-15-intel
   push:
     branches: ['traducao-contexto']
 
@@ -22,7 +26,9 @@ env:
 
 jobs:
   mac:
-    runs-on: macos-latest
+    # Apple Silicon runners are frequently unavailable on free accounts, so the
+    # build cross-compiles for Apple Silicon on an Intel runner by default.
+    runs-on: ${{ inputs.runner || 'macos-15-intel' }}
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7
@@ -46,7 +52,7 @@ jobs:
       # The command bindings are generated from the Rust commands; regenerate
       # them so the interface is built against exactly what the app exposes.
       - name: Regenerate command bindings
-        run: cargo run --release --target aarch64-apple-darwin -p koharu-app --bin generate
+        run: cargo run --release -p koharu-app --bin generate
 
       - name: Build the app
         run: >-
